@@ -50,7 +50,7 @@ function resolverFactory(targetMaybeThunk, models, options = {}) {
   if (options.after === undefined) options.after = (result) => result;
   if (options.handleConnection === undefined) options.handleConnection = true;
 
-  return async function (source, args, context, info) {
+  return async function(source, args, context, info) {
     let target =
         typeof targetMaybeThunk === "function" &&
         !checkIsModel(targetMaybeThunk)
@@ -126,7 +126,7 @@ function resolverFactory(targetMaybeThunk, models, options = {}) {
             throw new Error(`Unknown order by: ${field}`);
           }
 
-          return filterableAttributesFields[field] ?? field;
+          return filterableAttributesFields[field] || field;
         });
       });
     }
@@ -136,7 +136,7 @@ function resolverFactory(targetMaybeThunk, models, options = {}) {
     });
 
     return Promise.resolve(options.before(findOptions, args, context, info))
-      .then(function (findOptions) {
+      .then(function(findOptions) {
         if (args.where && !_.isEmpty(info.variableValues)) {
           whereQueryVarsToValues(args.where, info.variableValues);
           whereQueryVarsToValues(findOptions.where, info.variableValues);
@@ -156,14 +156,14 @@ function resolverFactory(targetMaybeThunk, models, options = {}) {
 
             return result;
           } else {
-            return source[association.accessors.get](findOptions).then(
-              function (result) {
-                if (options.handleConnection && isConnection(info.returnType)) {
-                  return handleConnection(result, args);
-                }
-                return result;
+            return source[association.accessors.get](findOptions).then(function(
+              result
+            ) {
+              if (options.handleConnection && isConnection(info.returnType)) {
+                return handleConnection(result, args);
               }
-            );
+              return result;
+            });
           }
         }
 
@@ -177,7 +177,7 @@ function resolverFactory(targetMaybeThunk, models, options = {}) {
 
         return model[list ? "findAll" : "findOne"](findOptions);
       })
-      .then(function (result) {
+      .then(function(result) {
         return options.after(result, args, context, info);
       });
   };
