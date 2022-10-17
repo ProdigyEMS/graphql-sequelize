@@ -37,7 +37,7 @@ function replaceKeyDeep(
         Object.prototype.toString.call(obj[key]) === "[object Object]"
       ) {
         const isModel = associations.find(
-          (model) => model.toLowerCase() === targetKey
+          (model) => model.toLowerCase() === targetKey.toLowerCase()
         );
         const validateField = (target) => {
           if (!filterableAttributes.includes(target)) {
@@ -48,14 +48,15 @@ function replaceKeyDeep(
         if (isModel) {
           Object.keys(obj[key]).forEach((column) => {
             validateField(column);
-            memo[`$${key}.${filterableAttributesFields[column]}$`] =
-              replaceKeyDeep(
-                obj[key][column],
-                keyMap,
-                filterableAttributes,
-                filterableAttributesFields,
-                associations
-              );
+            memo[
+              `$${key}.${filterableAttributesFields[column]}$`
+            ] = replaceKeyDeep(
+              obj[key][column],
+              keyMap,
+              filterableAttributes,
+              filterableAttributesFields,
+              associations
+            );
           });
         } else {
           validateField(targetKey);
