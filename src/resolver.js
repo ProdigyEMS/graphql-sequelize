@@ -74,17 +74,19 @@ function resolverFactory(targetMaybeThunk, models, options = {}) {
     const filterableAttributesFields = {};
     const filterableAttributes = [
       ...attributes,
-      ...Object.entries(models)
-        .filter(([key, model]) => associations.includes(key))
-        .map(([key, model]) =>
-          Object.entries(model.getAttributes())
-            .filter(([key, attr]) => !!attr.filterable)
-            .map(([key, attr]) => {
-              filterableAttributesFields[key] = attr.field;
-              return key;
-            })
-        )
-        .reduce((curr, next) => [...curr, ...next]),
+      ...(associations
+        ? Object.entries(models)
+            .filter(([key, model]) => associations.includes(key))
+            .map(([key, model]) =>
+              Object.entries(model.getAttributes())
+                .filter(([key, attr]) => !!attr.filterable)
+                .map(([key, attr]) => {
+                  filterableAttributesFields[key] = attr.field;
+                  return key;
+                })
+            )
+            .reduce((curr, next) => [...curr, ...next])
+        : []),
     ];
 
     let targetAttributes = Object.keys(model.getAttributes()),
