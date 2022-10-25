@@ -15,7 +15,7 @@ function replaceKeyDeep(
   requiredFilters,
   filtersValidator
 ) {
-  return Object.getOwnPropertySymbols(obj)
+  const result = Object.getOwnPropertySymbols(obj)
     .concat(Object.keys(obj))
     .reduce((memo, key) => {
       // determine which key we are going to use
@@ -85,13 +85,15 @@ function replaceKeyDeep(
         memo[targetKey] = obj[key];
       }
 
-      if (requiredFilters.length) {
-        throw new Error(`Filters: ${requiredFilters.toString()} are missing.`);
-      }
-
       // return the modified object
       return memo;
     }, {});
+
+  if (requiredFilters.length) {
+    throw new Error(`Filters: ${requiredFilters.toString()} are missing.`);
+  }
+
+  return result;
 }
 
 /**
