@@ -33,10 +33,7 @@
     "no-extra-boolean-cast": 2,
     "no-extra-semi": 2,
     "no-func-assign": 2,
-    "no-inner-declarations": [
-      2,
-      "functions"
-    ],
+    "no-inner-declarations": [2, "functions"],
     "no-invalid-regexp": 2,
     "no-irregular-whitespace": 2,
     "no-negated-in-lhs": 2,
@@ -118,14 +115,8 @@
       }
     ],
     "no-use-before-define": 0,
-    "handle-callback-err": [
-      2,
-      "error"
-    ],
-    "no-mixed-requires": [
-      2,
-      true
-    ],
+    "handle-callback-err": [2, "error"],
+    "no-mixed-requires": [2, true],
     "no-new-require": 2,
     "no-path-concat": 2,
     "no-process-exit": 0,
@@ -180,25 +171,11 @@
     "no-ternary": 0,
     "no-trailing-spaces": 2,
     "no-underscore-dangle": 0,
-    "no-extra-parens": 2,
     "one-var": 0,
-    "operator-assignment": [
-      2,
-      "always"
-    ],
+    "operator-assignment": [2, "always"],
     "padded-blocks": 0,
-    "quote-props": [
-      2,
-      "as-needed"
-    ],
-    "quotes": [
-      2,
-      "single"
-    ],
-    "semi": [
-      2,
-      "always"
-    ],
+    "quote-props": [2, "as-needed"],
+    "semi": [2, "always"],
     "semi-spacing": [
       2,
       {
@@ -207,21 +184,8 @@
       }
     ],
     "sort-vars": 0,
-    "space-after-keywords": [
-      2,
-      "always"
-    ],
-    "space-before-blocks": [
-      2,
-      "always"
-    ],
-    "space-before-function-paren": [
-      2,
-      {
-        "anonymous": "always",
-        "named": "never"
-      }
-    ],
+    "space-after-keywords": [2, "always"],
+    "space-before-blocks": [2, "always"],
     "space-in-brackets": 0,
     "space-in-parens": 0,
     "space-infix-ops": [
@@ -238,10 +202,7 @@
         "nonwords": false
       }
     ],
-    "spaced-comment": [
-      2,
-      "always"
-    ],
+    "spaced-comment": [2, "always"],
     "wrap-regex": 0,
     "no-var": 0,
     "max-len": [2, 130, 4]

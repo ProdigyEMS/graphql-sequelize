@@ -4,12 +4,14 @@ export default function argsToFindOptions(
   args,
   filterableAttributes,
   filterableAttributesFields,
-  associations
+  associations,
+  requiredAttributes,
+  filtersValidator
 ) {
   var result = {};
 
   if (args) {
-    Object.keys(args).forEach(function (key) {
+    Object.keys(args).forEach(function(key) {
       if (typeof args[key] !== "undefined") {
         if (key === "limit") {
           result.limit = parseInt(args[key], 10);
@@ -27,7 +29,9 @@ export default function argsToFindOptions(
             args.where,
             filterableAttributes,
             filterableAttributesFields,
-            associations
+            associations,
+            requiredAttributes,
+            filtersValidator
           );
         } else if (~filterableAttributes.indexOf(key)) {
           result.where = result.where || {};

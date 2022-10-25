@@ -28,7 +28,13 @@ function checkIsAssociation(target) {
   return !!target.associationType;
 }
 
-function resolverFactory(targetMaybeThunk, models, options = {}) {
+function resolverFactory(
+  targetMaybeThunk,
+  models,
+  requiredFilters,
+  filtersValidator,
+  options = {}
+) {
   assert(
     typeof targetMaybeThunk === "function" ||
       checkIsModel(targetMaybeThunk) ||
@@ -67,7 +73,7 @@ function resolverFactory(targetMaybeThunk, models, options = {}) {
         (type instanceof GraphQLNonNull && type.ofType instanceof GraphQLList);
 
     const attributes = Object.entries(model.getAttributes())
-      .filter(([key, attr]) => !!attr.filterable)
+      .filter(([, attr]) => !!attr.filterable)
       .map(([key]) => key);
     const associations = Object.keys(targetMaybeThunk.associations);
 
@@ -76,10 +82,10 @@ function resolverFactory(targetMaybeThunk, models, options = {}) {
       ...attributes,
       ...(associations
         ? Object.entries(models)
-            .filter(([key, model]) => associations.includes(key))
-            .map(([key, model]) =>
+            .filter(([key]) => associations.includes(key))
+            .map(([, model]) =>
               Object.entries(model.getAttributes())
-                .filter(([key, attr]) => !!attr.filterable)
+                .filter(([, attr]) => !!attr.filterable)
                 .map(([key, attr]) => {
                   filterableAttributesFields[key] = attr.field;
                   return key;
@@ -94,7 +100,9 @@ function resolverFactory(targetMaybeThunk, models, options = {}) {
         args,
         filterableAttributes,
         filterableAttributesFields,
-        associations
+        associations,
+        requiredFilters,
+        filtersValidator
       );
 
     info = {

@@ -11,7 +11,9 @@ function replaceKeyDeep(
   keyMap,
   filterableAttributes,
   filterableAttributesFields,
-  associations
+  associations,
+  requiredFilters,
+  filtersValidator
 ) {
   return Object.getOwnPropertySymbols(obj)
     .concat(Object.keys(obj))
@@ -28,7 +30,9 @@ function replaceKeyDeep(
               keyMap,
               filterableAttributes,
               filterableAttributesFields,
-              associations
+              associations,
+              requiredFilters,
+              filtersValidator
             );
           }
           return val;
@@ -55,7 +59,9 @@ function replaceKeyDeep(
               keyMap,
               filterableAttributes,
               filterableAttributesFields,
-              associations
+              associations,
+              requiredFilters,
+              filtersValidator
             );
           });
         } else {
@@ -65,12 +71,22 @@ function replaceKeyDeep(
             keyMap,
             filterableAttributes,
             filterableAttributesFields,
-            associations
+            associations,
+            requiredFilters,
+            filtersValidator
           );
         }
       } else {
+        requiredFilters = requiredFilters.filter(
+          (filter) => filter !== targetKey
+        );
+        filtersValidator && filtersValidator(targetKey, obj[key][targetKey]);
         // assign the new value
         memo[targetKey] = obj[key];
+      }
+
+      if (requiredFilters.length) {
+        throw new Error(`Filters: ${requiredFilters.toString()} are missing.`);
       }
 
       // return the modified object
@@ -87,13 +103,17 @@ export function replaceWhereOperators(
   where,
   filterableAttributes,
   filterableAttributesFields,
-  associations
+  associations,
+  requiredFilters,
+  filtersValidator
 ) {
   return replaceKeyDeep(
     where,
     sequelizeOps,
     filterableAttributes,
     filterableAttributesFields,
-    associations
+    associations,
+    requiredFilters,
+    filtersValidator
   );
 }
