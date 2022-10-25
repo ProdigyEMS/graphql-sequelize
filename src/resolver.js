@@ -80,7 +80,7 @@ function resolverFactory(
     const filterableAttributesFields = {};
     const filterableAttributes = [
       ...attributes,
-      ...(associations
+      ...(associations.length
         ? Object.entries(models)
             .filter(([key]) => associations.includes(key))
             .map(([, model]) =>

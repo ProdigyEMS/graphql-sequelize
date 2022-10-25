@@ -80,7 +80,7 @@ function replaceKeyDeep(
         requiredFilters = requiredFilters.filter(
           (filter) => filter !== targetKey
         );
-        filtersValidator && filtersValidator(targetKey, obj[key][targetKey]);
+        filtersValidator && filtersValidator(targetKey, obj[key]);
         // assign the new value
         memo[targetKey] = obj[key];
       }
