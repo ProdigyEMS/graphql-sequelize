@@ -32,7 +32,6 @@ function resolverFactory(
   targetMaybeThunk,
   models,
   requiredFilters,
-  filtersValidator,
   options = {}
 ) {
   assert(
@@ -101,8 +100,7 @@ function resolverFactory(
         filterableAttributes,
         filterableAttributesFields,
         associations,
-        requiredFilters,
-        filtersValidator
+        requiredFilters
       );
 
     info = {

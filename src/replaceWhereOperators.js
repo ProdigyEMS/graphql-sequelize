@@ -13,13 +13,16 @@ function replaceKeyDeep(
   filterableAttributesFields,
   associations,
   requiredFilters,
-  filtersValidator
+  recursive = false
 ) {
   const result = Object.getOwnPropertySymbols(obj)
     .concat(Object.keys(obj))
     .reduce((memo, key) => {
       // determine which key we are going to use
       let targetKey = keyMap[key] ? keyMap[key] : key;
+      requiredFilters = requiredFilters.filter(
+        (filter) => filter !== targetKey
+      );
 
       if (Array.isArray(obj[key])) {
         // recurse if an array
@@ -32,7 +35,7 @@ function replaceKeyDeep(
               filterableAttributesFields,
               associations,
               requiredFilters,
-              filtersValidator
+              true
             );
           }
           return val;
@@ -61,7 +64,7 @@ function replaceKeyDeep(
               filterableAttributesFields,
               associations,
               requiredFilters,
-              filtersValidator
+              true
             );
           });
         } else {
@@ -73,14 +76,10 @@ function replaceKeyDeep(
             filterableAttributesFields,
             associations,
             requiredFilters,
-            filtersValidator
+            true
           );
         }
       } else {
-        requiredFilters = requiredFilters.filter(
-          (filter) => filter !== targetKey
-        );
-        filtersValidator && filtersValidator(targetKey, obj[key]);
         // assign the new value
         memo[targetKey] = obj[key];
       }
@@ -89,8 +88,8 @@ function replaceKeyDeep(
       return memo;
     }, {});
 
-  if (requiredFilters.length) {
-    throw new Error(`Filters: ${requiredFilters.toString()} are missing.`);
+  if (!recursive && requiredFilters.length) {
+    throw new Error(`Filter ${requiredFilters[0]} is missing.`);
   }
 
   return result;
@@ -106,8 +105,7 @@ export function replaceWhereOperators(
   filterableAttributes,
   filterableAttributesFields,
   associations,
-  requiredFilters,
-  filtersValidator
+  requiredFilters
 ) {
   return replaceKeyDeep(
     where,
@@ -115,7 +113,6 @@ export function replaceWhereOperators(
     filterableAttributes,
     filterableAttributesFields,
     associations,
-    requiredFilters,
-    filtersValidator
+    requiredFilters
   );
 }

@@ -5,8 +5,7 @@ export default function argsToFindOptions(
   filterableAttributes,
   filterableAttributesFields,
   associations,
-  requiredAttributes,
-  filtersValidator
+  requiredAttributes
 ) {
   var result = {};
 
@@ -30,8 +29,7 @@ export default function argsToFindOptions(
             filterableAttributes,
             filterableAttributesFields,
             associations,
-            requiredAttributes,
-            filtersValidator
+            requiredAttributes
           );
         } else if (~filterableAttributes.indexOf(key)) {
           result.where = result.where || {};
