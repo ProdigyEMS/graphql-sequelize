@@ -1,6 +1,6 @@
 {
   "name": "@prodigyems/graphql-sequelize",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "GraphQL & Relay for MySQL & Postgres via Sequelize",
   "main": "lib/index.js",
   "options": {
