@@ -4,7 +4,7 @@ export default function argsToFindOptions(
   args,
   filterableAttributes,
   filterableAttributesFields,
-  associations,
+  allowedModels,
   requiredAttributes
 ) {
   var result = {};
@@ -28,7 +28,7 @@ export default function argsToFindOptions(
             args.where,
             filterableAttributes,
             filterableAttributesFields,
-            associations,
+            allowedModels,
             requiredAttributes
           );
         } else if (~filterableAttributes.indexOf(key)) {

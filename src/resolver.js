@@ -79,19 +79,19 @@ function resolverFactory(
     const filterableAttributesFields = {};
     const filterableAttributes = [
       ...attributes,
-      ...(associations.length
-        ? Object.entries(models)
-            .filter(([key]) => associations.includes(key))
-            .map(([, model]) =>
-              Object.entries(model.getAttributes())
-                .filter(([, attr]) => !!attr.filterable)
-                .map(([key, attr]) => {
-                  filterableAttributesFields[key] = attr.field;
-                  return key;
-                })
-            )
-            .reduce((curr, next) => [...curr, ...next])
-        : []),
+      ...Object.entries(models)
+        .filter(
+          ([key]) => associations.includes(key) || key === targetMaybeThunk.name
+        )
+        .map(([, model]) =>
+          Object.entries(model.getAttributes())
+            .filter(([, attr]) => !!attr.filterable)
+            .map(([key, attr]) => {
+              filterableAttributesFields[key] = attr.field;
+              return key;
+            })
+        )
+        .reduce((curr, next) => [...curr, ...next]),
     ];
 
     let targetAttributes = Object.keys(model.getAttributes()),
@@ -99,7 +99,7 @@ function resolverFactory(
         args,
         filterableAttributes,
         filterableAttributesFields,
-        associations,
+        [...associations, targetMaybeThunk.name],
         requiredFilters
       );
 
@@ -144,7 +144,7 @@ function resolverFactory(
     });
 
     return Promise.resolve(options.before(findOptions, args, context, info))
-      .then(function(findOptions) {
+      .then(async function(findOptions) {
         if (args.where && !_.isEmpty(info.variableValues)) {
           whereQueryVarsToValues(args.where, info.variableValues);
           whereQueryVarsToValues(findOptions.where, info.variableValues);
@@ -173,6 +173,38 @@ function resolverFactory(
               return result;
             });
           }
+        }
+
+        if (options.operation === "update") {
+          const dataArr = Object.entries(args.data).map(([key, value]) => {
+            return `${key} = ${value}`;
+          });
+          if (dataArr.length === 0) {
+            throw new Error("No data provided to perform an update.");
+          }
+          const updateData = dataArr.join(", ");
+          const joinsArr = Object.entries(
+            targetMaybeThunk.options.associations
+          ).map(([key, association]) => {
+            return `LEFT OUTER JOIN ${
+              models[key].tableName
+            } AS ${key} ON [${key}].[${association.foreignKey}] = [${
+              targetMaybeThunk.name
+            }].[${association.sourceKey}]`;
+          });
+          const updateJoins = joinsArr.length === 0 ? "" : joinsArr.join(",");
+
+          const whereObj = targetMaybeThunk.sequelize
+            .getQueryInterface()
+            .queryGenerator.getWhereConditions(findOptions.where);
+
+          const sql = `UPDATE ${
+            targetMaybeThunk.tableName
+          } SET ${updateData} FROM  ${targetMaybeThunk.tableName} AS ${
+            targetMaybeThunk.name
+          } ${updateJoins} WHERE ${whereObj}`;
+
+          await targetMaybeThunk.sequelize.query(sql);
         }
 
         Object.assign(context, {

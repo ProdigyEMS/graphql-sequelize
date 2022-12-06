@@ -11,7 +11,7 @@ function replaceKeyDeep(
   keyMap,
   filterableAttributes,
   filterableAttributesFields,
-  associations,
+  allowedModels,
   requiredFilters,
   recursive = false
 ) {
@@ -33,7 +33,7 @@ function replaceKeyDeep(
               keyMap,
               filterableAttributes,
               filterableAttributesFields,
-              associations,
+              allowedModels,
               requiredFilters,
               true
             );
@@ -43,7 +43,7 @@ function replaceKeyDeep(
       } else if (
         Object.prototype.toString.call(obj[key]) === "[object Object]"
       ) {
-        const isModel = associations.find(
+        const isModel = allowedModels.find(
           (model) => model.toLowerCase() === targetKey.toLowerCase()
         );
         const validateField = (target) => {
@@ -62,7 +62,7 @@ function replaceKeyDeep(
               keyMap,
               filterableAttributes,
               filterableAttributesFields,
-              associations,
+              allowedModels,
               requiredFilters,
               true
             );
@@ -74,7 +74,7 @@ function replaceKeyDeep(
             keyMap,
             filterableAttributes,
             filterableAttributesFields,
-            associations,
+            allowedModels,
             requiredFilters,
             true
           );
@@ -104,7 +104,7 @@ export function replaceWhereOperators(
   where,
   filterableAttributes,
   filterableAttributesFields,
-  associations,
+  allowedModels,
   requiredFilters
 ) {
   return replaceKeyDeep(
@@ -112,7 +112,7 @@ export function replaceWhereOperators(
     sequelizeOps,
     filterableAttributes,
     filterableAttributesFields,
-    associations,
+    allowedModels,
     requiredFilters
   );
 }
