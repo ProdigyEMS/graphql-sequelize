@@ -1,9 +1,9 @@
-import { GraphQLList, GraphQLNonNull } from "graphql";
-import _ from "lodash";
-import argsToFindOptions from "./argsToFindOptions";
-import { isConnection, handleConnection, nodeType } from "./relay";
-import assert from "assert";
-import Promise from "bluebird";
+import { GraphQLList, GraphQLNonNull } from 'graphql';
+import _ from 'lodash';
+import argsToFindOptions from './argsToFindOptions';
+import { isConnection, handleConnection, nodeType } from './relay';
+import assert from 'assert';
+import Promise from 'bluebird';
 
 function whereQueryVarsToValues(o, vals) {
   [
@@ -35,10 +35,10 @@ function resolverFactory(
   options = {}
 ) {
   assert(
-    typeof targetMaybeThunk === "function" ||
+    typeof targetMaybeThunk === 'function' ||
       checkIsModel(targetMaybeThunk) ||
       checkIsAssociation(targetMaybeThunk),
-    "resolverFactory should be called with a model, an association or a function (which resolves to a model or an association)"
+    'resolverFactory should be called with a model, an association or a function (which resolves to a model or an association)'
   );
 
   const contextToOptions = _.assign(
@@ -49,7 +49,7 @@ function resolverFactory(
 
   assert(
     options.include === undefined,
-    "Include support has been removed in favor of dataloader batching"
+    'Include support has been removed in favor of dataloader batching'
   );
   if (options.before === undefined) options.before = (options) => options;
   if (options.after === undefined) options.after = (result) => result;
@@ -57,7 +57,7 @@ function resolverFactory(
 
   return async function(source, args, context, info) {
     let target =
-        typeof targetMaybeThunk === "function" &&
+        typeof targetMaybeThunk === 'function' &&
         !checkIsModel(targetMaybeThunk)
           ? await Promise.resolve(targetMaybeThunk(source, args, context, info))
           : targetMaybeThunk,
@@ -94,7 +94,12 @@ function resolverFactory(
         .reduce((curr, next) => [...curr, ...next]),
     ];
 
-    let targetAttributes = Object.keys(model.getAttributes()),
+    let targetAttributes =
+        model.options.defaultScope?.attributes ||
+        Object.keys(model.getAttributes()),
+      targetFields = Object.values(model.getAttributes())
+        .filter((attr) => targetAttributes.includes(attr.fieldName))
+        .map((attr) => attr.field),
       findOptions = argsToFindOptions(
         args,
         filterableAttributes,
@@ -124,12 +129,12 @@ function resolverFactory(
     findOptions.include = associations;
     if (args.orderBy && Array.isArray(args.orderBy)) {
       findOptions.order = args.orderBy.map((order) => {
-        const firstOrder = order.splice(0, 1)[0].split(".");
+        const firstOrder = order.splice(0, 1)[0].split('.');
         return [...firstOrder, ...order].map((field) => {
           if (
             !associations.includes(field) &&
             !filterableAttributes.includes(field) &&
-            !["ASC", "DESC"].includes(field)
+            !['ASC', 'DESC'].includes(field)
           ) {
             throw new Error(`Unknown order by: ${field}`);
           }
@@ -151,7 +156,7 @@ function resolverFactory(
         }
 
         if (list && !findOptions.order) {
-          findOptions.order = [[model.primaryKeyAttribute, "ASC"]];
+          findOptions.order = [[model.primaryKeyAttribute, 'ASC']];
         }
 
         if (association) {
@@ -175,14 +180,14 @@ function resolverFactory(
           }
         }
 
-        if (options.operation === "update") {
+        if (options.operation === 'update') {
           const dataArr = Object.entries(args.data).map(([key, value]) => {
             return `${key} = ${value}`;
           });
           if (dataArr.length === 0) {
-            throw new Error("No data provided to perform an update.");
+            throw new Error('No data provided to perform an update.');
           }
-          const updateData = dataArr.join(", ");
+          const updateData = dataArr.join(', ');
           const joinsArr = Object.entries(
             targetMaybeThunk.options.associations
           ).map(([key, association]) => {
@@ -192,7 +197,7 @@ function resolverFactory(
               targetMaybeThunk.name
             }].[${association.sourceKey}]`;
           });
-          const updateJoins = joinsArr.length === 0 ? "" : joinsArr.join(",");
+          const updateJoins = joinsArr.length === 0 ? '' : joinsArr.join(',');
 
           const whereObj = targetMaybeThunk.sequelize
             .getQueryInterface()
@@ -212,10 +217,13 @@ function resolverFactory(
             model.count({
               where: findOptions.where,
               include: findOptions.include,
+              distinct: true,
             }),
         });
 
-        return model[list ? "findAll" : "findOne"](findOptions);
+        findOptions.group = targetFields;
+
+        return model[list ? 'findAll' : 'findOne'](findOptions);
       })
       .then(function(result) {
         return options.after(result, args, context, info);

@@ -1,4 +1,4 @@
-import sequelizeOps from "./sequelizeOps";
+import sequelizeOps from './sequelizeOps';
 
 /**
  * Replace a key deeply in an object
@@ -27,7 +27,7 @@ function replaceKeyDeep(
       if (Array.isArray(obj[key])) {
         // recurse if an array
         memo[targetKey] = obj[key].map((val) => {
-          if (Object.prototype.toString.call(val) === "[object Object]") {
+          if (Object.prototype.toString.call(val) === '[object Object]') {
             return replaceKeyDeep(
               val,
               keyMap,
@@ -41,7 +41,7 @@ function replaceKeyDeep(
           return val;
         });
       } else if (
-        Object.prototype.toString.call(obj[key]) === "[object Object]"
+        Object.prototype.toString.call(obj[key]) === '[object Object]'
       ) {
         const isModel = allowedModels.find(
           (model) => model.toLowerCase() === targetKey.toLowerCase()
@@ -55,17 +55,8 @@ function replaceKeyDeep(
         if (isModel) {
           Object.keys(obj[key]).forEach((column) => {
             validateField(column);
-            memo[
-              `$${key}.${filterableAttributesFields[column]}$`
-            ] = replaceKeyDeep(
-              obj[key][column],
-              keyMap,
-              filterableAttributes,
-              filterableAttributesFields,
-              allowedModels,
-              requiredFilters,
-              true
-            );
+            memo[`$${key}.${filterableAttributesFields[column]}$`] =
+              obj[key][column];
           });
         } else {
           validateField(targetKey);
