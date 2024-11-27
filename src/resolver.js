@@ -95,7 +95,7 @@ function resolverFactory(
     ];
 
     let targetAttributes =
-        model.options.defaultScope?.attributes ||
+        (model.options.defaultScope && model.options.defaultScope.attributes) ||
         Object.keys(model.getAttributes()),
       targetFields = Object.values(model.getAttributes())
         .filter((attr) => targetAttributes.includes(attr.fieldName))
