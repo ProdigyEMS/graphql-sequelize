@@ -39,7 +39,7 @@ export default new GraphQLScalarType({
         return null;
       }
       return new Date(value);
-    } catch (e) {
+    } catch {
       return null;
     }
   },

@@ -39,7 +39,7 @@ describe('resolver', function () {
    * A Task belongs to a Project, which can have Labels.
    */
   before(function () {
-    this.sandbox = sinon.sandbox.create();
+    this.sandbox = sinon.createSandbox();
 
     sequelize.modelManager.models = [];
     sequelize.models = {};

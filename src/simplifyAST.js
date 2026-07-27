@@ -33,9 +33,9 @@ function simplifyObjectValue(objectValue) {
   return objectValue.fields.reduce((memo, field) => {
     memo[field.name.value] =
       field.value.kind === 'IntValue' ? parseInt( field.value.value, 10 ) :
-      field.value.kind === 'FloatValue' ? parseFloat( field.value.value ) :
-      field.value.kind === 'ObjectValue' ? simplifyObjectValue( field.value ) :
-        field.value.value;
+        field.value.kind === 'FloatValue' ? parseFloat( field.value.value ) :
+          field.value.kind === 'ObjectValue' ? simplifyObjectValue( field.value ) :
+            field.value.value;
 
     return memo;
   }, {});

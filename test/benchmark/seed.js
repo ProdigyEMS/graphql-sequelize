@@ -1,6 +1,6 @@
 'use strict';
 
-require('babel-register');
+require('@babel/register');
 
 var models = require('./models').models
   , sequelize = require('./models').sequelize;

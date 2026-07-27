@@ -74,8 +74,8 @@ export function typeResolver(nodeTypeMapper) {
                || (obj.Model
                  ? obj.Model.options.name.singular
                  : obj._modelOptions
-                 ? obj._modelOptions.name.singular
-                 : obj.name);
+                   ? obj._modelOptions.name.singular
+                   : obj.name);
 
     if (!type) {
       throw new Error(`Unable to determine type of ${ typeof obj }. ` +
@@ -136,8 +136,8 @@ export function createConnectionResolver({
   let orderByDirection = function (orderDirection, args) {
     if (args.last) {
       return orderDirection.indexOf('ASC') >= 0
-              ? orderDirection.replace('ASC', 'DESC')
-              : orderDirection.replace('DESC', 'ASC');
+        ? orderDirection.replace('ASC', 'DESC')
+        : orderDirection.replace('DESC', 'ASC');
     }
     return orderDirection;
   };
@@ -151,8 +151,8 @@ export function createConnectionResolver({
   let toCursor = function (item, index) {
     const model = getModelOfInstance(item);
     const id = model ?
-               typeof model.primaryKeyAttribute === 'string' ? item[model.primaryKeyAttribute] : null :
-               item[Object.keys(item)[0]];
+      typeof model.primaryKeyAttribute === 'string' ? item[model.primaryKeyAttribute] : null :
+      item[Object.keys(item)[0]];
     return base64(JSON.stringify([id, index]));
   };
 
@@ -215,8 +215,8 @@ export function createConnectionResolver({
       orderByEnum = typeof orderByEnum === 'string' ? info.schema.getType(orderByEnum) : orderByEnum;
 
       let orderBy = args.orderBy ? args.orderBy :
-                    orderByEnum ? [orderByEnum._values[0].value] :
-                    [[model.primaryKeyAttribute, 'ASC']];
+        orderByEnum ? [orderByEnum._values[0].value] :
+          [[model.primaryKeyAttribute, 'ASC']];
 
       if (orderByEnum && typeof orderBy === 'string') {
         orderBy = [orderByEnum._nameLookup[args.orderBy].value];

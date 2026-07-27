@@ -128,7 +128,7 @@ describe('relay', function () {
       });
 
       beforeEach(function () {
-        this.sinon = sinon.sandbox.create();
+        this.sinon = sinon.createSandbox();
 
         this.viewer = this.User.build({
           id: Math.ceil(Math.random() * 999)
