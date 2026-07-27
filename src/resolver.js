@@ -123,6 +123,10 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
         Object.keys(model.getAttributes()),
       targetFields = Object.values(model.getAttributes())
         .filter((attr) => targetAttributes.includes(attr.fieldName))
+        // VIRTUAL attributes are computed in JS and have no column, so
+        // including them produces `GROUP BY ... myVirtual` and the database
+        // rejects the statement with an unknown-column error.
+        .filter((attr) => !attr.type || attr.type.key !== 'VIRTUAL')
         .map((attr) => attr.field),
       findOptions = argsToFindOptions(
         args,
@@ -249,7 +253,12 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
             }),
         });
 
-        findOptions.group = targetFields;
+        // Qualify with the model alias. Bare column names collide with the
+        // joined table's columns once an include is present -- `GROUP BY id`
+        // against a user/tasks join fails with "ambiguous column name: id".
+        findOptions.group = targetFields.map((field) =>
+          model.sequelize.col(`${model.name}.${field}`)
+        );
 
         return model[list ? 'findAll' : 'findOne'](findOptions);
       })

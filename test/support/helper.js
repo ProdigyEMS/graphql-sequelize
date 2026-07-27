@@ -44,7 +44,8 @@ export function createSequelize(options = {}) {
   const sequelize = new Sequelize(config.database, config.user, config.password, {
     host: config.host,
     dialect: dialect,
-    logging: false,
+    // Set SEQUELIZE_LOGGING=1 to see generated SQL when diagnosing failures.
+    logging: env.SEQUELIZE_LOGGING ? console.log : false,
     ...options
   });
 
