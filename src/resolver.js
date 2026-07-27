@@ -28,10 +28,14 @@ function checkIsAssociation(target) {
   return !!target.associationType;
 }
 
+// `models` and `requiredFilters` default to empty rather than being required.
+// Both defaults fail closed: with no models there are no cross-model
+// filterable attributes to add, and with no required filters none are
+// enforced. Neither default widens what a caller is able to filter on.
 function resolverFactory(
   targetMaybeThunk,
-  models,
-  requiredFilters,
+  models = {},
+  requiredFilters = [],
   options = {}
 ) {
   assert(
@@ -74,7 +78,15 @@ function resolverFactory(
     const attributes = Object.entries(model.getAttributes())
       .filter(([, attr]) => !!attr.filterable)
       .map(([key]) => key);
-    const associations = Object.keys(targetMaybeThunk.associations);
+    // targetMaybeThunk is only a Model in the simplest case -- it may also be
+    // a thunk or an association (see the assert above), neither of which
+    // carries `.associations`. Fall back to the resolved model, then to an
+    // empty set, which fails closed by contributing no filterable attributes.
+    const associations = Object.keys(
+      (targetMaybeThunk && targetMaybeThunk.associations) ||
+        (model && model.associations) ||
+        {}
+    );
 
     const filterableAttributesFields = {};
     const filterableAttributes = [
@@ -91,7 +103,11 @@ function resolverFactory(
               return key;
             })
         )
-        .reduce((curr, next) => [...curr, ...next]),
+        // Initial value is required: without it this throws "Reduce of empty
+        // array with no initial value" whenever no entry in `models` matches
+        // the association filter above, which includes the case where no
+        // models were supplied at all.
+        .reduce((curr, next) => [...curr, ...next], []),
     ];
 
     let targetAttributes =

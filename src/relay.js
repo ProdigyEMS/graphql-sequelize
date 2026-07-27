@@ -57,7 +57,10 @@ export function idFetcher(sequelize, nodeTypeMapper) {
 
     const model = Object.keys(sequelize.models).find(model => model === type);
     if (model) {
-      return sequelize.models[model].findById(id);
+      const target = sequelize.models[model];
+      // findById was renamed to findByPk in sequelize 5 and removed in 6.
+      // peerDependencies still allow >=3.0.0, so support both spellings.
+      return target.findByPk ? target.findByPk(id) : target.findById(id);
     }
 
     if (nodeType) {

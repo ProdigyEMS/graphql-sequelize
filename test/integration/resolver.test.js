@@ -166,7 +166,7 @@ describe('resolver', function () {
               type: GraphQLInt
             }
           },
-          resolve: resolver(() => User.Tasks, {
+          resolve: resolver(() => User.Tasks, {}, [], {
             before: function (options, args) {
               if (args.first) {
                 options.order = options.order || [];
@@ -188,7 +188,7 @@ describe('resolver', function () {
               type: new GraphQLList(GraphQLInt)
             }
           },
-          resolve: resolver(User.Tasks, {
+          resolve: resolver(User.Tasks, {}, [], {
             before: (options, args) => {
               options.where = options.where || {};
               options.where.id = { $in: args.ids };
@@ -210,7 +210,7 @@ describe('resolver', function () {
                 type: new GraphQLNonNull(GraphQLInt)
               }
             },
-            resolve: resolver(User, {
+            resolve: resolver(User, {}, [], {
               contextToOptions: {
                 a: 'a',
                 b: 'c'
@@ -522,7 +522,7 @@ describe('resolver', function () {
                 type: GraphQLString
               }
             },
-            resolve: resolver(User, {
+            resolve: resolver(User, {}, [], {
               before: function (options, args, {name}) {
                 options.where = options.where || {};
                 options.where.name = name;
@@ -568,7 +568,7 @@ describe('resolver', function () {
                 type: GraphQLString
               }
             },
-            resolve: resolver(User, {
+            resolve: resolver(User, {}, [], {
               after: function (result) {
                 return result.map(function () {
                   return {
@@ -1026,7 +1026,7 @@ describe('resolver', function () {
         fields: {
           users: {
             type: new GraphQLList(userType),
-            resolve: resolver(User, {
+            resolve: resolver(User, {}, [], {
               before: function (options) {
                 options.include = [User.Tasks];
                 options.order = [
@@ -1089,7 +1089,7 @@ describe('resolver', function () {
                 type: GraphQLString
               }
             },
-            resolve: resolver(User, {
+            resolve: resolver(User, {}, [], {
               before: function (options) {
                 return Promise.resolve(options);
               },
@@ -1183,7 +1183,7 @@ describe('resolver', function () {
         fields: {
           users: {
             type: new GraphQLNonNull(new GraphQLList(userType)),
-            resolve: resolver(User, {
+            resolve: resolver(User, {}, [], {
               before: function (options, args, { name }) {
                 options.where = options.where || {};
                 options.where.name = name;

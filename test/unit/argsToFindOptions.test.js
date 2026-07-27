@@ -12,7 +12,7 @@ describe('argsToFindOptions', function () {
   });
 
   it('should not include "order" when present in both args and targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { property: 1 }, order: 'order' }, targetAttributes);
+    var findOptions = argsToFindOptions({ where: { property: 1 }, order: 'order' }, targetAttributes, {}, [], []);
 
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).not.to.have.ownProperty('order');
@@ -21,7 +21,7 @@ describe('argsToFindOptions', function () {
   });
 
   it('should not include "limit" when present in both args targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { property: 1 }, limit: 1 }, targetAttributes);
+    var findOptions = argsToFindOptions({ where: { property: 1 }, limit: 1 }, targetAttributes, {}, [], []);
 
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).not.to.have.ownProperty('limit');
@@ -30,7 +30,7 @@ describe('argsToFindOptions', function () {
   });
 
   it('should not include "offset" when present in both args and targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { property: 1 }, offset: 1 }, targetAttributes);
+    var findOptions = argsToFindOptions({ where: { property: 1 }, offset: 1 }, targetAttributes, {}, [], []);
 
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).not.to.have.ownProperty('offset');
@@ -39,13 +39,13 @@ describe('argsToFindOptions', function () {
   });
 
   it('should allow filtering by "order" column when in targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { order: 1 } });
+    var findOptions = argsToFindOptions({ where: { order: 1 } }, [], {}, [], []);
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).to.have.ownProperty('order');
   });
 
   it('should allow filtering and ordering by "order" column when in targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { order: 1 }, order: 'order' });
+    var findOptions = argsToFindOptions({ where: { order: 1 }, order: 'order' }, [], {}, [], []);
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).to.have.ownProperty('order');
     expect(findOptions).to.have.ownProperty('order');
@@ -53,7 +53,7 @@ describe('argsToFindOptions', function () {
   });
 
   it('should allow value = 0', function () {
-    var findOptions = argsToFindOptions({ where: { order: 0 }, offset: 0, limit: 0 }, []);
+    var findOptions = argsToFindOptions({ where: { order: 0 }, offset: 0, limit: 0 }, [], {}, [], []);
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).to.have.ownProperty('order');
     expect(findOptions).to.have.ownProperty('offset');

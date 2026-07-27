@@ -43,12 +43,21 @@ function replaceKeyDeep(
       } else if (
         Object.prototype.toString.call(obj[key]) === '[object Object]'
       ) {
-        const isModel = allowedModels.find(
-          (model) => model.toLowerCase() === targetKey.toLowerCase()
-        );
+        // On sequelize 4+ operator keys map to Symbols rather than strings
+        // (see sequelizeOps). A Symbol is never a model name and never an
+        // attribute name, so both checks below apply to string keys only.
+        // Symbols can only originate from the fixed operator map, so skipping
+        // them here does not widen what a caller can filter on -- any key that
+        // is not a known operator stays a string and is still validated.
+        const isStringKey = typeof targetKey === 'string';
+        const isModel =
+          isStringKey &&
+          allowedModels.find(
+            (model) => model.toLowerCase() === targetKey.toLowerCase()
+          );
         const validateField = (target) => {
           if (!filterableAttributes.includes(target)) {
-            throw new Error(`Unknown attribute: ${target}`);
+            throw new Error(`Unknown attribute: ${String(target)}`);
           }
         };
 
@@ -59,7 +68,9 @@ function replaceKeyDeep(
               obj[key][column];
           });
         } else {
-          validateField(targetKey);
+          if (isStringKey) {
+            validateField(targetKey);
+          }
           memo[targetKey] = replaceKeyDeep(
             obj[key],
             keyMap,
