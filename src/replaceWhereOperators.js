@@ -55,8 +55,14 @@ function replaceKeyDeep(
           allowedModels.find(
             (model) => model.toLowerCase() === targetKey.toLowerCase()
           );
+        // A null filterableAttributes means validation was explicitly disabled
+        // by the caller (see replaceWhereOperators). An empty array still
+        // validates, and rejects everything.
         const validateField = (target) => {
-          if (!filterableAttributes.includes(target)) {
+          if (
+            filterableAttributes !== null &&
+            !filterableAttributes.includes(target)
+          ) {
             throw new Error(`Unknown attribute: ${String(target)}`);
           }
         };
@@ -99,20 +105,33 @@ function replaceKeyDeep(
 
 /**
  * Replace the where arguments object and return the sequelize compatible version.
+ *
+ * BREAKING (1.0.0): the validation parameters moved from positional arguments
+ * into an options object, and attribute validation is now on by default.
+ *
+ * Validation is opt-out rather than opt-in deliberately. A caller that forgets
+ * to pass its filterable set gets validation against an empty list, which
+ * rejects everything -- the safe direction. Turning it off requires saying so
+ * explicitly via `validateAttributes: false`.
+ *
  * @param where arguments object in GraphQL Safe format meaning no leading "$" chars.
+ * @param options validation context; see above.
  * @returns {Object}
  */
 export function replaceWhereOperators(
   where,
-  filterableAttributes,
-  filterableAttributesFields,
-  allowedModels,
-  requiredFilters
+  {
+    filterableAttributes = [],
+    filterableAttributesFields = {},
+    allowedModels = [],
+    requiredFilters = [],
+    validateAttributes = true
+  } = {}
 ) {
   return replaceKeyDeep(
     where,
     sequelizeOps,
-    filterableAttributes,
+    validateAttributes ? filterableAttributes : null,
     filterableAttributesFields,
     allowedModels,
     requiredFilters

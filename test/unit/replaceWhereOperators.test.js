@@ -100,7 +100,7 @@ describe('replaceWhereOperators', () => {
       };
 
     }
-    expect(replaceWhereOperators(before, [], {}, [], [])).to.deep.equal(after);
+    expect(replaceWhereOperators(before, { filterableAttributes: [] })).to.deep.equal(after);
   });
 
   it('should not mutate argument', () => {
@@ -131,6 +131,6 @@ describe('replaceWhereOperators', () => {
         prop2: {[Sequelize.Op.or]: [{[Sequelize.Op.eq]: 3}, {[Sequelize.Op.eq]: 4}]}
       }
     }
-    expect(replaceWhereOperators(proxify(before), ['prop1', 'prop2'], {}, [], [])).to.deep.equal(after);
+    expect(replaceWhereOperators(proxify(before), { filterableAttributes: ['prop1', 'prop2'] })).to.deep.equal(after);
   });
 });

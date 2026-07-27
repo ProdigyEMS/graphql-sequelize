@@ -6,7 +6,7 @@ import sinon from 'sinon';
 import attributeFields from '../../../src/attributeFields';
 import resolver from '../../../src/resolver';
 import {uniq, property, sortBy} from 'lodash';
-import { Promise, sequelize } from '../../support/helper';
+import { Promise, sequelize, markFilterable, beforeRemoveAllTables } from '../../support/helper';
 
 import {
   sequelizeConnection,
@@ -32,6 +32,8 @@ import {
 
 describe('relay', function () {
   describe('connection', function () {
+    beforeRemoveAllTables();
+
     before(async function () {
       var self = this;
 
@@ -57,6 +59,10 @@ describe('relay', function () {
       this.Task.Project = this.Task.belongsTo(this.Project, {as: 'project', foreignKey: 'projectId'});
 
       this.Project.Owner = this.Project.belongsTo(this.User, {as: 'owner', foreignKey: 'ownerId'});
+
+      // The connection specs order by createdAt, which sequelize generates
+      // rather than the fixture declaring it, so opt it in explicitly.
+      markFilterable(this.Task, 'createdAt', 'id');
 
       this.taskType = new GraphQLObjectType({
         name: this.Task.name,

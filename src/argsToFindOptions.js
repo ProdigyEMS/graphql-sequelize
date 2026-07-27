@@ -24,13 +24,13 @@ export default function argsToFindOptions(
           }
         } else if (key === "where") {
           // setup where
-          result.where = replaceWhereOperators(
-            args.where,
+          // args.where is client-supplied, so attribute validation stays on.
+          result.where = replaceWhereOperators(args.where, {
             filterableAttributes,
             filterableAttributesFields,
             allowedModels,
-            requiredAttributes
-          );
+            requiredFilters: requiredAttributes
+          });
         } else if (~filterableAttributes.indexOf(key)) {
           result.where = result.where || {};
           result.where[key] = args[key];

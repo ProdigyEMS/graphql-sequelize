@@ -183,7 +183,10 @@ export function createConnectionResolver({
       Object.assign(result, where(key, value, result));
     });
 
-    return replaceWhereOperators(result);
+    // Keys here come from the application's own `where` callback rather than
+    // directly from client input, so attribute validation does not apply.
+    // Stated explicitly so it cannot happen by omission.
+    return replaceWhereOperators(result, { validateAttributes: false });
   };
 
   let resolveEdge = function (item, index, queriedCursor, sourceArgs = {}, source) {

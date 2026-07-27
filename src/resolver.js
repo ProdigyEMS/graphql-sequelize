@@ -153,8 +153,12 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
     findOptions.include = associations;
     if (args.orderBy && Array.isArray(args.orderBy)) {
       findOptions.order = args.orderBy.map((order) => {
-        const firstOrder = order.splice(0, 1)[0].split('.');
-        return [...firstOrder, ...order].map((field) => {
+        // Destructure rather than splice: splice mutates the caller's
+        // orderBy entry, so resolving the same args object twice saw an
+        // already-emptied array and threw on undefined.split.
+        const [first, ...rest] = order;
+        const firstOrder = String(first).split('.');
+        return [...firstOrder, ...rest].map((field) => {
           if (
             !associations.includes(field) &&
             !filterableAttributes.includes(field) &&
