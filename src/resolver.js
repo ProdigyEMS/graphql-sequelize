@@ -29,6 +29,40 @@ function checkIsAssociation(target) {
 }
 
 /**
+ * Whether the named association is exposed as a Relay connection on the given
+ * GraphQL type.
+ *
+ * Used to decide whether an association is safe to eager-load; see the
+ * findOptions.include assignment for why connections must be excluded.
+ *
+ * @param {Object} graphqlType the type currently being resolved
+ * @param {String} associationName the sequelize association alias
+ * @return {Boolean} true when the field resolves to a connection
+ */
+function resolvesToConnection(graphqlType, associationName) {
+  let namedType = graphqlType;
+  while (namedType && (namedType.ofType || namedType.type)) {
+    namedType = namedType.ofType || namedType.type;
+  }
+
+  if (!namedType || typeof namedType.getFields !== 'function') {
+    return false;
+  }
+
+  const field = namedType.getFields()[associationName];
+  if (!field || !field.type) {
+    return false;
+  }
+
+  let fieldType = field.type;
+  while (fieldType.ofType) {
+    fieldType = fieldType.ofType;
+  }
+
+  return isConnection(fieldType);
+}
+
+/**
  * BREAKING (1.0.0): `models` and `requiredFilters` moved from positional
  * parameters 2 and 3 into `options`, restoring the upstream
  * resolver(target, options) shape.
@@ -154,7 +188,22 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
     findOptions.attributes = targetAttributes;
     findOptions.logging = findOptions.logging || context.logging;
     findOptions.graphqlContext = context;
-    findOptions.include = associations;
+    // Eager-load associations to avoid N+1, but never one that is resolved as
+    // a Relay connection.
+    //
+    // Those two behaviours contradict each other. Including an association
+    // here means source[association.as] is already populated by the time the
+    // child resolver runs, and the branch further down returns that preloaded
+    // array verbatim on the assumption the caller asked for it deliberately.
+    // A connection's `first`/`last` limit is applied to findOptions, which
+    // that path never uses -- so `tasks(first: 3)` returned every task.
+    //
+    // Connections are therefore left out and resolve themselves through the
+    // association getter, which does honour the limit. Plain nested objects
+    // still get eager-loaded exactly as before.
+    findOptions.include = associations.filter(
+      (associationName) => !resolvesToConnection(type, associationName)
+    );
     if (args.orderBy && Array.isArray(args.orderBy)) {
       findOptions.order = args.orderBy.map((order) => {
         // Destructure rather than splice: splice mutates the caller's
@@ -192,7 +241,17 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
         }
 
         if (association) {
-          if (source[association.as] !== undefined) {
+          // A preloaded association can only be used verbatim when this
+          // resolver has no constraints of its own to apply. If it does -- a
+          // limit from first/last, or a where built from args -- returning the
+          // preloaded array silently ignores them, which is how
+          // `tasks(first: 3)` came back with every task. In that case go
+          // through the association getter so findOptions is actually honoured.
+          const hasUnappliedConstraints = Boolean(
+            findOptions.limit || findOptions.where || findOptions.offset
+          );
+
+          if (source[association.as] !== undefined && !hasUnappliedConstraints) {
             // The user did a manual include
             const result = source[association.as];
             if (options.handleConnection && isConnection(info.returnType)) {
