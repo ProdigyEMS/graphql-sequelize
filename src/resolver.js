@@ -28,16 +28,24 @@ function checkIsAssociation(target) {
   return !!target.associationType;
 }
 
-// `models` and `requiredFilters` default to empty rather than being required.
-// Both defaults fail closed: with no models there are no cross-model
-// filterable attributes to add, and with no required filters none are
-// enforced. Neither default widens what a caller is able to filter on.
-function resolverFactory(
-  targetMaybeThunk,
-  models = {},
-  requiredFilters = [],
-  options = {}
-) {
+/**
+ * BREAKING (1.0.0): `models` and `requiredFilters` moved from positional
+ * parameters 2 and 3 into `options`, restoring the upstream
+ * resolver(target, options) shape.
+ *
+ * The positional form was a footgun: a legacy two-argument call such as
+ * resolver(User, { before }) silently bound its options object to `models`
+ * and ran with no options at all, failing at runtime rather than at the
+ * call site.
+ *
+ * Both values default to empty and fail closed -- no models means no
+ * cross-model filterable attributes, no required filters means none are
+ * enforced. Neither default widens what a caller is able to filter on.
+ * They are destructured out of `options` so they cannot leak into the
+ * sequelize find options built further down.
+ */
+function resolverFactory(targetMaybeThunk, rawOptions = {}) {
+  const { models = {}, requiredFilters = [], ...options } = rawOptions;
   assert(
     typeof targetMaybeThunk === 'function' ||
       checkIsModel(targetMaybeThunk) ||
