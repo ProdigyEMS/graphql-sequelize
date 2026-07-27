@@ -1,6 +1,10 @@
 import Sequelize from 'sequelize';
+import Bluebird from 'bluebird';
 
-export const Promise = Sequelize.Promise;
+// Sequelize 6 removed Sequelize.Promise (it uses native promises). The test
+// helpers rely on Bluebird-only APIs such as Promise.method, so source it
+// from the bluebird dependency directly.
+export const Promise = Bluebird;
 export const sequelize = createSequelize();
 
 export function createSequelize(options = {}) {

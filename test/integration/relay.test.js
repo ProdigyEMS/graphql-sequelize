@@ -245,7 +245,7 @@ describe('relay', function () {
       , projectId = 1
       , taskId = 1;
 
-    return sequelize.sync({force: true}).bind(this).then(function () {
+    return Promise.resolve(sequelize.sync({force: true})).bind(this).then(function () {
       return Promise.join(
         Project.create({
           id: projectId++,

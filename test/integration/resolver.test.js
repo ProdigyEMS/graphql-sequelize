@@ -246,7 +246,7 @@ describe('resolver', function () {
     var taskId = 0
       , projectId = 0;
 
-    return sequelize.sync({force: true}).bind(this).then(function () {
+    return Promise.resolve(sequelize.sync({force: true})).bind(this).then(function () {
       return Promise.join(
         Project.create({
           id: ++projectId,
