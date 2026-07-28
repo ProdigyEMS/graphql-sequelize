@@ -66,7 +66,7 @@
     "sequelize": "^6.37.8",
     "sinon": "^19.0.5",
     "sinon-chai": "^3.7.0",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^6.0.1",
     "tedious": "^20.0.0"
   },
   "directories": {
@@ -78,8 +78,6 @@
     "node": ">=18"
   },
   "overrides": {
-    "node-gyp": "^11.0.0",
-    "tar": "^7.5.22",
     "brace-expansion": "^5.0.8",
     "serialize-javascript": "^7.0.5"
   }
