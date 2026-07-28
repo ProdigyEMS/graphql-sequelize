@@ -73,9 +73,18 @@ export function idFetcher(sequelize, nodeTypeMapper) {
 
 export function typeResolver(nodeTypeMapper) {
   return (obj, context, info) => {
+    // Sequelize 6 instances expose neither `.Model` nor `._modelOptions` --
+    // both were removed after v3 -- so the old chain fell through to
+    // `obj.name`, which on a model instance is the value of its `name`
+    // column. The type lookup then failed and node queries resolved to null.
+    // getModelOfInstance handles the modern shape (instance.constructor) and
+    // still falls back to `.Model` for older sequelize versions, which the
+    // peerDependency range still permits.
+    const modelOfInstance = getModelOfInstance(obj);
+
     var type = obj.__graphqlType__
-               || (obj.Model
-                 ? obj.Model.options.name.singular
+               || (modelOfInstance && modelOfInstance.options
+                 ? modelOfInstance.options.name.singular
                  : obj._modelOptions
                    ? obj._modelOptions.name.singular
                    : obj.name);
