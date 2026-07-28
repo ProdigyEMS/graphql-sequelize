@@ -17,11 +17,25 @@ export default function argsToFindOptions(
         } else if (key === "offset") {
           result.offset = parseInt(args[key], 10);
         } else if (key === "order") {
-          if (args[key].indexOf("reverse:") === 0) {
-            result.order = [[args[key].substring(8), "DESC"]];
-          } else {
-            result.order = [[args[key], "ASC"]];
+          // The ordering column is client-supplied and was previously applied
+          // without any check, so a caller could sort by any column in the
+          // table regardless of whether the model marked it filterable.
+          // Ordering by a column leaks information about it even when the
+          // column itself is never selected, so it is validated against the
+          // same set as `where`.
+          const descending = args[key].indexOf("reverse:") === 0;
+          const orderAttribute = descending
+            ? args[key].substring(8)
+            : args[key];
+
+          if (
+            Array.isArray(filterableAttributes) &&
+            !filterableAttributes.includes(orderAttribute)
+          ) {
+            throw new Error(`Unknown order by: ${orderAttribute}`);
           }
+
+          result.order = [[orderAttribute, descending ? "DESC" : "ASC"]];
         } else if (key === "where") {
           // setup where
           // args.where is client-supplied, so attribute validation stays on.
