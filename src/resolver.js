@@ -29,6 +29,51 @@ function checkIsAssociation(target) {
 }
 
 /**
+ * Order an eager-loaded association array by the target model's primary key.
+ *
+ * A join emitted for an `include` carries no ORDER BY, so the rows arrive in
+ * whatever order the database felt like producing. The query path does not
+ * have this problem -- it defaults to `[[primaryKeyAttribute, 'ASC']]` for any
+ * list -- but the preloaded path returned the array untouched, so the two
+ * disagreed.
+ *
+ * That is worse than untidy for a Relay connection. Cursors are positional:
+ * page one and page two are two separate round trips, and on postgres the same
+ * unordered join genuinely does come back in different orders between them, so
+ * the cursor from page one indexes into a different sequence on page two and
+ * the caller silently sees a duplicated or skipped row. sqlite and mysql
+ * happen to return insertion order here, which is why this only ever surfaced
+ * as an intermittent postgres failure -- but nothing guarantees it on mssql,
+ * the dialect the consuming service actually runs.
+ *
+ * Sorts a copy: the array belongs to the parent instance, and reordering it in
+ * place would be visible to anything else holding that instance.
+ *
+ * @param {Array} rows the preloaded association rows
+ * @param {Object} model the sequelize model the rows belong to
+ * @return {Array} rows ordered by primary key ascending
+ */
+function orderByPrimaryKey(rows, model) {
+  const primaryKey = model && model.primaryKeyAttribute;
+  if (!Array.isArray(rows) || !primaryKey) {
+    return rows;
+  }
+
+  // Primary keys are not always numeric (uuid, string), so compare with the
+  // relational operators rather than subtracting.
+  return [...rows].sort((a, b) => {
+    const left = a && a.get ? a.get(primaryKey) : undefined;
+    const right = b && b.get ? b.get(primaryKey) : undefined;
+
+    if (left === right) return 0;
+    if (left === undefined || left === null) return -1;
+    if (right === undefined || right === null) return 1;
+
+    return left < right ? -1 : 1;
+  });
+}
+
+/**
  * Whether the named association is exposed as a Relay connection on the given
  * GraphQL type.
  *
@@ -276,8 +321,14 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
           );
 
           if (source[association.as] !== undefined && !hasUnappliedConstraints) {
-            // The user did a manual include
-            const result = source[association.as];
+            // The user did a manual include.
+            //
+            // Apply the same primary-key ordering the query path defaults to
+            // for lists, so a preloaded array and a fetched one agree. Relay
+            // cursors are positional and this array is about to be sliced by
+            // one, so an unordered join is not merely inconsistent -- it makes
+            // pagination return the wrong rows. See orderByPrimaryKey.
+            const result = orderByPrimaryKey(source[association.as], model);
             if (options.handleConnection && isConnection(info.returnType)) {
               return handleConnection(result, args);
             }

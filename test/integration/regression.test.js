@@ -11,7 +11,12 @@ import {
   GraphQLEnumType,
   graphql
 } from 'graphql';
-import { globalIdField, toGlobalId } from 'graphql-relay';
+import {
+  globalIdField,
+  toGlobalId,
+  connectionArgs,
+  connectionDefinitions
+} from 'graphql-relay';
 
 import resolver from '../../src/resolver';
 import { sequelizeConnection, sequelizeNodeInterface } from '../../src/relay';
@@ -88,12 +93,28 @@ describe('regressions', function () {
       })
     });
 
+    // A plain graphql-relay connection, deliberately NOT sequelizeConnection:
+    // it has no ordering of its own and slices the resolver's result array in
+    // memory, which is the shape that exposed the unordered-eager-load defect.
+    // The field name also differs from the association alias ('tasks' vs the
+    // sequelize alias), which is what stopped it being recognised as a
+    // connection and left it eager-loaded in the first place.
+    this.plainTaskConnection = connectionDefinitions({
+      name: 'RegressionPlainTask',
+      nodeType: this.taskType
+    });
+
     this.userType = new GraphQLObjectType({
       name: 'RegressionUser',
       fields: () => ({
         id: globalIdField('RegressionUser'),
         name: { type: GraphQLString },
         nameUpper: { type: GraphQLString },
+        plainTasks: {
+          type: this.plainTaskConnection.connectionType,
+          args: connectionArgs,
+          resolve: resolver(this.User.Tasks)
+        },
         tasks: {
           type: new GraphQLList(this.taskType),
           args: {
@@ -318,6 +339,114 @@ describe('regressions', function () {
 
       const titles = data.user.taskConnection.edges.map(({ node }) => node.title);
       expect(new Set(titles).size).to.equal(titles.length);
+    });
+  });
+
+  describe('eager-loaded association ordering', function () {
+    /**
+     * Load the parent with its association deliberately in descending primary
+     * key order, so the preloaded array disagrees with the order the resolver
+     * is required to produce.
+     *
+     * Scrambling the physical rows and hoping the planner returns them in that
+     * order does not work -- it stays free to use an index and hand back
+     * primary key order anyway, which makes the assertion pass whether or not
+     * the fix is present. Setting the include order explicitly removes the
+     * planner from the question: the array reaching the resolver is known-bad
+     * by construction, so the assertion tests the resolver rather than the
+     * database.
+     */
+    async function loadParentWithReversedChildren(User, Task, association, id) {
+      return User.findOne({
+        where: { id },
+        include: [{ model: Task, as: association.as }],
+        order: [[{ model: Task, as: association.as }, 'id', 'DESC']]
+      });
+    }
+
+    /**
+     * Minimal GraphQLResolveInfo. The resolver reads returnType to decide
+     * whether it is resolving a list or a connection; nothing else on info is
+     * touched on this path.
+     */
+    function resolveInfo(returnType) {
+      return { returnType };
+    }
+
+    it('returns a preloaded list in primary-key order', async function () {
+      const parent = await loadParentWithReversedChildren(
+        this.User,
+        this.Task,
+        this.User.Tasks,
+        this.user.id
+      );
+
+      const preloaded = parent[this.User.Tasks.as].map((task) => task.get('id'));
+      expect(
+        preloaded,
+        'fixture must hand the resolver an out-of-order array'
+      ).to.not.deep.equal([...preloaded].sort((a, b) => a - b));
+
+      const result = await resolver(this.User.Tasks)(
+        parent,
+        {},
+        {},
+        resolveInfo(new GraphQLList(this.taskType))
+      );
+
+      const ids = result.map((task) => task.get('id'));
+      expect(ids).to.deep.equal([...ids].sort((a, b) => a - b));
+    });
+
+    it('slices a plain connection from primary-key order, not join order', async function () {
+      // The user-visible damage: a relay cursor is positional, so slicing a
+      // reverse-ordered array returned the last rows while reporting them as
+      // the first page.
+      const parent = await loadParentWithReversedChildren(
+        this.User,
+        this.Task,
+        this.User.Tasks,
+        this.user.id
+      );
+
+      const ascendingIds = parent[this.User.Tasks.as]
+        .map((task) => task.get('id'))
+        .sort((a, b) => a - b);
+
+      const result = await resolver(this.User.Tasks)(
+        parent,
+        { first: 2 },
+        {},
+        resolveInfo(this.plainTaskConnection.connectionType)
+      );
+
+      expect(result.edges.map(({ node }) => node.get('id'))).to.deep.equal(
+        ascendingIds.slice(0, 2)
+      );
+    });
+
+    it('does not reorder the parent instance in place', async function () {
+      // The array belongs to the parent, so sorting it in place would be
+      // visible to anything else holding that instance.
+      const parent = await loadParentWithReversedChildren(
+        this.User,
+        this.Task,
+        this.User.Tasks,
+        this.user.id
+      );
+
+      const before = parent[this.User.Tasks.as].map((task) => task.get('id'));
+
+      await resolver(this.User.Tasks)(
+        parent,
+        {},
+        {},
+        resolveInfo(new GraphQLList(this.taskType))
+      );
+
+      expect(
+        parent[this.User.Tasks.as].map((task) => task.get('id'))
+      ).to.deep.equal(before);
     });
   });
 
