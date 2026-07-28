@@ -76,5 +76,11 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "overrides": {
+    "node-gyp": "^11.0.0",
+    "tar": "^7.5.22",
+    "brace-expansion": "^5.0.8",
+    "serialize-javascript": "^7.0.5"
   }
 }
