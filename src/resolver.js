@@ -210,12 +210,26 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
         // orderBy entry, so resolving the same args object twice saw an
         // already-emptied array and threw on undefined.split.
         const [first, ...rest] = order;
+
+        // An order attribute may be a function, which the connection layer
+        // resolves against (source, args, context, info) before building the
+        // query -- see orderByAttribute in relay.js. There is no column name
+        // to validate at this point, so pass the entry through untouched and
+        // let that layer deal with it. Stringifying it here produced
+        // nonsense like "Unknown order by: spy".
+        if (typeof first === 'function') {
+          return order;
+        }
+
         const firstOrder = String(first).split('.');
         return [...firstOrder, ...rest].map((field) => {
+          // Direction modifiers can carry a null-ordering suffix, e.g.
+          // 'ASC NULLS LAST'. Validate the direction keyword itself.
+          const [direction] = String(field).split(' ');
           if (
             !associations.includes(field) &&
             !filterableAttributes.includes(field) &&
-            !['ASC', 'DESC'].includes(field)
+            !['ASC', 'DESC'].includes(direction)
           ) {
             throw new Error(`Unknown order by: ${field}`);
           }
