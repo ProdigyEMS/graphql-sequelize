@@ -29,6 +29,15 @@ export function createSequelize(options = {}) {
       password: env.MYSQL_ENV_MYSQL_PASSWORD,
       database: env.MYSQL_ENV_MYSQL_DATABASE
     },
+    // mssql is the dialect the consuming service actually runs
+    // (node/src/db.config.ts sets dialect: 'mssql' over tedious), so it is
+    // the one the suite most needs to cover.
+    dialect === 'mssql' && {
+      host: env.MSSQL_PORT_1433_TCP_ADDR,
+      user: env.MSSQL_ENV_MSSQL_USER,
+      password: env.MSSQL_ENV_MSSQL_PASSWORD,
+      database: env.MSSQL_ENV_MSSQL_DATABASE
+    },
     dialect === 'postgres' && env.CI && {
       user: 'postgres',
       password: '',
@@ -99,7 +108,7 @@ export function beforeRemoveAllTables() {
     // the result -- re-running against a populated database moved the suite
     // from 11 passing to 9. sqlite is excluded: each run gets a fresh
     // database, so there is nothing to clear.
-    if (['mysql', 'postgres'].includes(sequelize.dialect.name)) {
+    if (['mysql', 'postgres', 'mssql'].includes(sequelize.dialect.name)) {
       this.timeout(10000);
       return removeAllTables(sequelize);
     }
@@ -117,6 +126,14 @@ export function removeAllTables(sequelize) {
   const dialect = sequelize.dialect.name;
 
   function getTables() {
+    if (dialect === 'mssql') {
+      return sequelize
+        .query(
+          "SELECT TABLE_NAME AS name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'"
+        )
+        .then(([rows]) => rows.map((row) => row.name));
+    }
+
     if (dialect === 'postgres') {
       return sequelize
         .query("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
@@ -130,6 +147,24 @@ export function removeAllTables(sequelize) {
   }
 
   function dropTable(table) {
+    // mssql has no CASCADE on DROP TABLE, so foreign keys must be removed
+    // first; the repeated getTables() pass below then retries whatever the
+    // remaining references blocked.
+    if (dialect === 'mssql') {
+      return sequelize
+        .query(
+          `DECLARE @sql NVARCHAR(MAX) = N'';
+           SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id))
+             + '.' + QUOTENAME(OBJECT_NAME(parent_object_id))
+             + ' DROP CONSTRAINT ' + QUOTENAME(name) + ';'
+           FROM sys.foreign_keys WHERE OBJECT_NAME(referenced_object_id) = N'${table}';
+           EXEC sp_executesql @sql;`
+        )
+        .catch(() => {})
+        .then(() => sequelize.query(`DROP TABLE IF EXISTS [${table}]`))
+        .catch(() => {});
+    }
+
     const quoted =
       dialect === 'postgres' ? `"${table}"` : '`' + table + '`';
     const cascade = dialect === 'postgres' ? ' CASCADE' : '';

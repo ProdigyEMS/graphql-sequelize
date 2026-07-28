@@ -138,17 +138,34 @@ describe('relay', function () {
             // joins projects, which also has createdAt/updatedAt, and an
             // unqualified reference fails with "column reference
             // \"createdAt\" is ambiguous".
-            if (sequelize.dialect.name === 'postgres') {
-              options.order = Sequelize.literal(`
-                CASE
-                  WHEN "task"."completed" = true THEN "task"."createdAt"
-                  ELSE "task"."otherDate" End ASC`);
-            } else {
-              options.order = Sequelize.literal(`
-                CASE
-                  WHEN \`task\`.\`completed\` = true THEN \`task\`.\`createdAt\`
-                  ELSE \`task\`.\`otherDate\` End ASC`);
-            }
+            //
+            // Identifiers are quoted through the dialect's own query
+            // generator rather than hardcoded per dialect. Each engine quotes
+            // differently -- "x" on postgres, `x` on mysql/sqlite, [x] on
+            // mssql -- and the previous postgres/else split silently handed
+            // mssql the MySQL backtick form.
+            const queryInterface = sequelize.getQueryInterface();
+            const queryGenerator =
+              queryInterface.queryGenerator || queryInterface.QueryGenerator;
+            const col = (name) =>
+              `${queryGenerator.quoteIdentifier('task')}.${queryGenerator.quoteIdentifier(name)}`;
+
+            // mssql has no boolean literal; `completed` is a BIT there.
+            const isTrue =
+              sequelize.dialect.name === 'mssql' ? '1' : 'true';
+
+            // Single line: sequelize's mssql dialect rewrites order + limit
+            // into OFFSET/FETCH and mangles a multi-line literal, emitting a
+            // stray fragment ahead of its own ORDER BY.
+            // Wrapped in an array, which is sequelize's documented order
+            // form. Passed bare, the mssql dialect does not recognise it as
+            // the ordering for OFFSET/FETCH pagination and appends a second
+            // ORDER BY of its own, producing invalid SQL.
+            options.order = [
+              Sequelize.literal(
+                `CASE WHEN ${col('completed')} = ${isTrue} THEN ${col('createdAt')} ELSE ${col('otherDate')} END ASC`
+              )
+            ];
           }
           return options;
         },
