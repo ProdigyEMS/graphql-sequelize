@@ -12,7 +12,7 @@ function replaceKeyDeep(
   filterableAttributes,
   filterableAttributesFields,
   allowedModels,
-  requiredFilters,
+  remainingFilters,
   recursive = false
 ) {
   const result = Object.getOwnPropertySymbols(obj)
@@ -20,9 +20,13 @@ function replaceKeyDeep(
     .reduce((memo, key) => {
       // determine which key we are going to use
       let targetKey = keyMap[key] ? keyMap[key] : key;
-      requiredFilters = requiredFilters.filter(
-        (filter) => filter !== targetKey
-      );
+      // A Set mutated in place, not a reassigned array. Reassigning rebound
+      // only this invocation's local, so a required filter satisfied inside a
+      // recursive call never cleared for the caller: a where of
+      // `{ and: [{ organizationId: 1 }] }` supplies the filter but still
+      // failed the top-level check with "Filter organizationId is missing".
+      // Deleting from a shared Set propagates out of the recursion.
+      remainingFilters.delete(targetKey);
 
       // On sequelize 4+ operator keys map to Symbols rather than strings (see
       // sequelizeOps). A Symbol is never a model name and never an attribute
@@ -54,7 +58,7 @@ function replaceKeyDeep(
               filterableAttributes,
               filterableAttributesFields,
               allowedModels,
-              requiredFilters,
+              remainingFilters,
               true
             );
           }
@@ -86,7 +90,7 @@ function replaceKeyDeep(
             filterableAttributes,
             filterableAttributesFields,
             allowedModels,
-            requiredFilters,
+            remainingFilters,
             true
           );
         }
@@ -108,8 +112,9 @@ function replaceKeyDeep(
       return memo;
     }, {});
 
-  if (!recursive && requiredFilters.length) {
-    throw new Error(`Filter ${requiredFilters[0]} is missing.`);
+  if (!recursive && remainingFilters.size) {
+    const [missing] = remainingFilters;
+    throw new Error(`Filter ${String(missing)} is missing.`);
   }
 
   return result;
@@ -146,6 +151,6 @@ export function replaceWhereOperators(
     validateAttributes ? filterableAttributes : null,
     filterableAttributesFields,
     allowedModels,
-    requiredFilters
+    new Set(requiredFilters)
   );
 }

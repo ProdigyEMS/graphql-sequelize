@@ -97,6 +97,91 @@ describe('authorization: filterable attributes', function () {
         )
       ).to.not.throw();
     });
+
+    it('accepts a required filter satisfied inside and', function () {
+      // The satisfying key is nested, so it was cleared in a recursive call
+      // whose result never reached the top-level check. It failed closed --
+      // rejecting a query that did supply the filter -- rather than open.
+      expect(() =>
+        replaceWhereOperators(
+          { and: [{ organizationId: 1 }] },
+          {
+            filterableAttributes: ['organizationId'],
+            requiredFilters: ['organizationId']
+          }
+        )
+      ).to.not.throw();
+    });
+
+    it('accepts a required filter satisfied inside or', function () {
+      expect(() =>
+        replaceWhereOperators(
+          { or: [{ organizationId: 1 }, { organizationId: 2 }] },
+          {
+            filterableAttributes: ['organizationId'],
+            requiredFilters: ['organizationId']
+          }
+        )
+      ).to.not.throw();
+    });
+
+    it('accepts a required filter satisfied several levels down', function () {
+      expect(() =>
+        replaceWhereOperators(
+          { and: [{ or: [{ organizationId: { eq: 1 } }] }] },
+          {
+            filterableAttributes: ['organizationId'],
+            requiredFilters: ['organizationId']
+          }
+        )
+      ).to.not.throw();
+    });
+
+    it('still rejects when no nesting supplies the required filter', function () {
+      // The fix must not turn the check into a no-op: this is the case the
+      // requirement exists for.
+      expect(() =>
+        replaceWhereOperators(
+          { and: [{ allowed: 1 }, { or: [{ allowed: 2 }] }] },
+          {
+            filterableAttributes: ['allowed', 'organizationId'],
+            requiredFilters: ['organizationId']
+          }
+        )
+      ).to.throw(/Filter organizationId is missing/);
+    });
+
+    it('enforces every required filter, not just the first', function () {
+      expect(() =>
+        replaceWhereOperators(
+          { and: [{ organizationId: 1 }] },
+          {
+            filterableAttributes: ['organizationId', 'departmentId'],
+            requiredFilters: ['organizationId', 'departmentId']
+          }
+        )
+      ).to.throw(/Filter departmentId is missing/);
+    });
+
+    it('does not consume the caller\'s requiredFilters array', function () {
+      // The Set is built per call. Sharing one across calls would let the
+      // first query satisfy the requirement for every later one.
+      const requiredFilters = ['organizationId'];
+      const options = {
+        filterableAttributes: ['organizationId'],
+        requiredFilters
+      };
+
+      replaceWhereOperators({ organizationId: 1 }, options);
+
+      // The array the caller handed in is untouched...
+      expect(requiredFilters).to.deep.equal(['organizationId']);
+
+      // ...so a later query that omits the filter is still rejected.
+      expect(() => replaceWhereOperators({}, options)).to.throw(
+        /Filter organizationId is missing/
+      );
+    });
   });
 
   describe('argsToFindOptions', function () {
