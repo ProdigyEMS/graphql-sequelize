@@ -200,7 +200,10 @@ describe('resolver', function () {
           resolve: resolver(User.Tasks, {
             before: (options, args) => {
               options.where = options.where || {};
-              options.where.id = { $in: args.ids };
+              // Sequelize 6 removed the string operator form ($in); operators
+              // are Symbols now. The old syntax is treated as a literal column
+              // key and stringifies to '[object Object]' in the query.
+              options.where.id = { [Sequelize.Op.in]: args.ids };
               return options;
             }
           })

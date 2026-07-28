@@ -62,7 +62,7 @@ describe('relay', function () {
 
       // The connection specs order by createdAt, which sequelize generates
       // rather than the fixture declaring it, so opt it in explicitly.
-      markFilterable(this.Task, 'createdAt', 'id');
+      markFilterable(this.Task, 'createdAt', 'updatedAt', 'id');
       markFilterable(this.User, 'id');
       markFilterable(this.Project, 'id');
 
@@ -134,16 +134,20 @@ describe('relay', function () {
         before: (options) => {
           options.raw = true;
           if (options.order && options.order[0][0] === 'updatedAt') {
+            // Columns are qualified with the table alias: this connection
+            // joins projects, which also has createdAt/updatedAt, and an
+            // unqualified reference fails with "column reference
+            // \"createdAt\" is ambiguous".
             if (sequelize.dialect.name === 'postgres') {
               options.order = Sequelize.literal(`
                 CASE
-                  WHEN completed = true THEN "createdAt"
-                  ELSE "otherDate" End ASC`);
+                  WHEN "task"."completed" = true THEN "task"."createdAt"
+                  ELSE "task"."otherDate" End ASC`);
             } else {
               options.order = Sequelize.literal(`
                 CASE
-                  WHEN completed = true THEN \`createdAt\`
-                  ELSE \`otherDate\` End ASC`);
+                  WHEN \`task\`.\`completed\` = true THEN \`task\`.\`createdAt\`
+                  ELSE \`task\`.\`otherDate\` End ASC`);
             }
           }
           return options;
