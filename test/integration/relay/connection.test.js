@@ -63,6 +63,8 @@ describe('relay', function () {
       // The connection specs order by createdAt, which sequelize generates
       // rather than the fixture declaring it, so opt it in explicitly.
       markFilterable(this.Task, 'createdAt', 'id');
+      markFilterable(this.User, 'id');
+      markFilterable(this.Project, 'id');
 
       this.taskType = new GraphQLObjectType({
         name: this.Task.name,
