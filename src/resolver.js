@@ -312,12 +312,27 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
             }),
         });
 
-        // Qualify with the model alias. Bare column names collide with the
-        // joined table's columns once an include is present -- `GROUP BY id`
-        // against a user/tasks join fails with "ambiguous column name: id".
-        findOptions.group = targetFields.map((field) =>
-          model.sequelize.col(`${model.name}.${field}`)
-        );
+        // Group only when nothing is being joined in.
+        //
+        // The group exists to collapse duplicate parent rows, but it can only
+        // list the target model's own columns. Postgres enforces the SQL
+        // standard here and rejects the query outright -- `column
+        // "project.id" must appear in the GROUP BY clause or be used in an
+        // aggregate function` -- because the include's columns are selected
+        // but not grouped. sqlite and MySQL happen to tolerate it, which is
+        // why this only ever surfaced on postgres.
+        //
+        // Without an include there is no fan-out to collapse, so the group is
+        // only needed in the case where it is also legal.
+        //
+        // Columns are qualified with the model alias: bare names collide with
+        // the joined table's once an include is present, giving
+        // "ambiguous column name: id".
+        if (!findOptions.include || findOptions.include.length === 0) {
+          findOptions.group = targetFields.map((field) =>
+            model.sequelize.col(`${model.name}.${field}`)
+          );
+        }
 
         return model[list ? 'findAll' : 'findOne'](findOptions);
       })

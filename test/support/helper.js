@@ -141,7 +141,13 @@ export function removeAllTables(sequelize) {
 
   return getTables()
     .then(tables => {
-      return Promise.all(tables.map(table => dropTable(table)));
+      // Sequentially, not Promise.all: concurrent `DROP TABLE ... CASCADE`
+      // statements take AccessExclusiveLocks on each other's foreign-key
+      // constraints and postgres kills one with "deadlock detected".
+      return tables.reduce(
+        (chain, table) => chain.then(() => dropTable(table)),
+        Promise.resolve()
+      );
     })
     .then(() => {
       return getTables();
