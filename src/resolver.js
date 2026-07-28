@@ -261,8 +261,18 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
           // preloaded array silently ignores them, which is how
           // `tasks(first: 3)` came back with every task. In that case go
           // through the association getter so findOptions is actually honoured.
+          // args.order/args.orderBy rather than findOptions.order: a default
+          // order is applied to every list a few lines above, so testing the
+          // findOptions value would treat every list as constrained and
+          // disable eager loading entirely. Only an order the caller actually
+          // asked for counts, since the eager-loaded rows arrive in whatever
+          // order the join produced.
           const hasUnappliedConstraints = Boolean(
-            findOptions.limit || findOptions.where || findOptions.offset
+            findOptions.limit ||
+              findOptions.where ||
+              findOptions.offset ||
+              args.order ||
+              args.orderBy
           );
 
           if (source[association.as] !== undefined && !hasUnappliedConstraints) {
