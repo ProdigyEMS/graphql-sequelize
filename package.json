@@ -14,7 +14,7 @@
     "test:unit": "npm run build:test && mocha \".build/test/unit/**/*.test.js\"",
     "build:docker": "docker-compose build",
     "test:docker": "DIALECT=${DIALECT:=postgres} docker-compose run dev /bin/sh -c \"npm run test:integration\"",
-    "test:integration": "npm run build:test && mocha \".build/test/integration/**/*.test.js\"",
+    "test:integration": "npm run build:test && node scripts/run-integration.cjs",
     "psql": "docker run -it --link graphqlsequelize_postgres_1:postgres --rm postgres:9.4 sh -c 'PGPASSWORD=graphql_sequelize_test exec psql -h \"$POSTGRES_PORT_5432_TCP_ADDR\" -p \"$POSTGRES_PORT_5432_TCP_PORT\" -U graphql_sequelize_test'",
     "cover": "npm run build:test && c8 mocha \".build/test/**/*.test.js\"",
     "build:test": "rm -rf .build && babel src --out-dir .build/src && babel test --out-dir .build/test --ignore test/benchmark"
