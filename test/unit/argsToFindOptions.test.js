@@ -4,7 +4,10 @@ import { expect } from 'chai';
 import argsToFindOptions from '../../src/argsToFindOptions';
 
 describe('argsToFindOptions', function () {
-  var targetAttributes = ['order', 'limit', 'offset'];
+  // 'property' is included because these specs filter on it. Scalar where
+  // values are validated against the filterable set like any other attribute
+  // reference, so an attribute a spec filters on has to be declared here.
+  var targetAttributes = ['order', 'limit', 'offset', 'property'];
 
   it('should return empty with no args or attributes', function () {
     var findOptions = argsToFindOptions(null, null);
@@ -39,13 +42,13 @@ describe('argsToFindOptions', function () {
   });
 
   it('should allow filtering by "order" column when in targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { order: 1 } }, [], {}, [], []);
+    var findOptions = argsToFindOptions({ where: { order: 1 } }, targetAttributes, {}, [], []);
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).to.have.ownProperty('order');
   });
 
   it('should allow filtering and ordering by "order" column when in targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { order: 1 }, order: 'order' }, [], {}, [], []);
+    var findOptions = argsToFindOptions({ where: { order: 1 }, order: 'order' }, targetAttributes, {}, [], []);
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).to.have.ownProperty('order');
     expect(findOptions).to.have.ownProperty('order');
@@ -53,7 +56,7 @@ describe('argsToFindOptions', function () {
   });
 
   it('should allow value = 0', function () {
-    var findOptions = argsToFindOptions({ where: { order: 0 }, offset: 0, limit: 0 }, [], {}, [], []);
+    var findOptions = argsToFindOptions({ where: { order: 0 }, offset: 0, limit: 0 }, ['order'], {}, [], []);
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).to.have.ownProperty('order');
     expect(findOptions).to.have.ownProperty('offset');

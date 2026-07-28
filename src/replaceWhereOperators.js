@@ -24,6 +24,26 @@ function replaceKeyDeep(
         (filter) => filter !== targetKey
       );
 
+      // On sequelize 4+ operator keys map to Symbols rather than strings (see
+      // sequelizeOps). A Symbol is never a model name and never an attribute
+      // name, so the checks below apply to string keys only. Symbols can only
+      // originate from the fixed operator map, so skipping them does not
+      // widen what a caller can filter on -- any key that is not a known
+      // operator stays a string and is still validated.
+      const isStringKey = typeof targetKey === 'string';
+
+      // A null filterableAttributes means validation was explicitly disabled
+      // by the caller (see replaceWhereOperators). An empty array still
+      // validates, and rejects everything.
+      const validateField = (target) => {
+        if (
+          filterableAttributes !== null &&
+          !filterableAttributes.includes(target)
+        ) {
+          throw new Error(`Unknown attribute: ${String(target)}`);
+        }
+      };
+
       if (Array.isArray(obj[key])) {
         // recurse if an array
         memo[targetKey] = obj[key].map((val) => {
@@ -44,28 +64,11 @@ function replaceKeyDeep(
         Object.prototype.toString.call(obj[key]) === '[object Object]'
       ) {
         // On sequelize 4+ operator keys map to Symbols rather than strings
-        // (see sequelizeOps). A Symbol is never a model name and never an
-        // attribute name, so both checks below apply to string keys only.
-        // Symbols can only originate from the fixed operator map, so skipping
-        // them here does not widen what a caller can filter on -- any key that
-        // is not a known operator stays a string and is still validated.
-        const isStringKey = typeof targetKey === 'string';
         const isModel =
           isStringKey &&
           allowedModels.find(
             (model) => model.toLowerCase() === targetKey.toLowerCase()
           );
-        // A null filterableAttributes means validation was explicitly disabled
-        // by the caller (see replaceWhereOperators). An empty array still
-        // validates, and rejects everything.
-        const validateField = (target) => {
-          if (
-            filterableAttributes !== null &&
-            !filterableAttributes.includes(target)
-          ) {
-            throw new Error(`Unknown attribute: ${String(target)}`);
-          }
-        };
 
         if (isModel) {
           Object.keys(obj[key]).forEach((column) => {
@@ -88,6 +91,15 @@ function replaceKeyDeep(
           );
         }
       } else {
+        // Scalar value. This path was previously unvalidated, so while
+        // `{ secret: { eq: 1 } }` was correctly rejected, the simpler and far
+        // more natural `{ secret: 1 }` filtered on an attribute the model
+        // never marked filterable. Validate it the same as any other
+        // attribute reference.
+        if (isStringKey) {
+          validateField(targetKey);
+        }
+
         // assign the new value
         memo[targetKey] = obj[key];
       }
