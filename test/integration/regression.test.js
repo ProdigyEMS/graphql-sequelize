@@ -187,7 +187,7 @@ describe('regressions', function () {
    * data, which several of these defects surfaced as.
    */
   async function run(schema, query) {
-    const result = await graphql(schema, query);
+    const result = await graphql({ schema, source: query });
     if (result.errors) {
       throw new Error(result.errors[0].stack || result.errors[0].message);
     }
@@ -458,10 +458,10 @@ describe('regressions', function () {
       expect(this.Task.getAttributes().title.filterable).to.equal(true);
       expect(this.Task.getAttributes().createdAt.filterable).to.not.equal(true);
 
-      const result = await graphql(
-        this.schema,
-        `{ user(id: ${this.user.id}) { tasks(order: "createdAt") { title } } }`
-      );
+      const result = await graphql({
+        schema: this.schema,
+        source: `{ user(id: ${this.user.id}) { tasks(order: "createdAt") { title } } }`
+      });
 
       expect(result.errors, 'an undeclared attribute must be refused').to.not
         .equal(undefined);
@@ -469,10 +469,10 @@ describe('regressions', function () {
     });
 
     it('allows an order on an attribute that is filterable', async function () {
-      const result = await graphql(
-        this.schema,
-        `{ user(id: ${this.user.id}) { tasks(order: "title") { title } } }`
-      );
+      const result = await graphql({
+        schema: this.schema,
+        source: `{ user(id: ${this.user.id}) { tasks(order: "title") { title } } }`
+      });
 
       expect(result.errors).to.equal(undefined);
     });

@@ -72,7 +72,7 @@ export function idFetcher(sequelize, nodeTypeMapper) {
 }
 
 export function typeResolver(nodeTypeMapper) {
-  return (obj, context, info) => {
+  return (obj) => {
     // Sequelize 6 instances expose neither `.Model` nor `._modelOptions` --
     // both were removed after v3 -- so the old chain fell through to
     // `obj.name`, which on a model instance is the value of its `name`
@@ -87,7 +87,9 @@ export function typeResolver(nodeTypeMapper) {
                  ? modelOfInstance.options.name.singular
                  : obj._modelOptions
                    ? obj._modelOptions.name.singular
-                   : obj.name);
+                   : obj.constructor && obj.constructor.options
+                     ? obj.constructor.options.name.singular
+                     : obj.name);
 
     if (!type) {
       throw new Error(`Unable to determine type of ${ typeof obj }. ` +
@@ -96,7 +98,7 @@ export function typeResolver(nodeTypeMapper) {
 
     const nodeType = nodeTypeMapper.item(type);
     if (nodeType) {
-      return typeof nodeType.type === 'string' ? info.schema.getType(nodeType.type) : nodeType.type;
+      return typeof nodeType.type === 'string' ? nodeType.type : nodeType.type.name;
     }
 
     return null;

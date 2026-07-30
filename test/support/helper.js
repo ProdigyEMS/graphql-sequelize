@@ -115,6 +115,10 @@ export function beforeRemoveAllTables() {
   });
 }
 
+export function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Not nice too, MySQL does not supports same name for foreign keys
 // Solution ? Force remove all tables!
 //
