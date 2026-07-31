@@ -11,28 +11,36 @@ const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
+const generatedModules = [
+  'argsToFindOptions',
+  'attributeFields',
+  'base64',
+  'defaultArgs',
+  'defaultListArgs',
+  'index',
+  'normalizeVariableValues',
+  'relay',
+  'replaceWhereOperators',
+  'resolver',
+  'sequelizeOps',
+  'simplifyAST',
+  'typeMapper',
+  'types/dateType',
+  'types/jsonType'
+];
 const expectedFiles = [
   'CHANGELOG.md',
   'LICENSE',
   'README.md',
-  'lib/argsToFindOptions.js',
-  'lib/attributeFields.js',
-  'lib/base64.js',
-  'lib/defaultArgs.js',
-  'lib/defaultListArgs.js',
-  'lib/index.js',
-  'lib/normalizeVariableValues.js',
-  'lib/relay.js',
-  'lib/replaceWhereOperators.js',
-  'lib/resolver.js',
-  'lib/sequelizeOps.js',
-  'lib/simplifyAST.js',
-  'lib/typeMapper.js',
-  'lib/types/dateType.js',
-  'lib/types/jsonType.js',
+  ...generatedModules.flatMap((modulePath) => [
+    `lib/${modulePath}.d.ts`,
+    `lib/${modulePath}.d.ts.map`,
+    `lib/${modulePath}.js`,
+    `lib/${modulePath}.js.map`
+  ]),
   'package.json',
   'types/index.d.ts'
-];
+].sort();
 const tarballPath = process.argv[2];
 const packedFiles = JSON.parse(process.argv[3] || '[]').sort();
 const consumerDirectory = mkdtempSync(

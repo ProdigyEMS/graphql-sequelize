@@ -1,12 +1,14 @@
 'use strict';
 
 import { expect } from 'chai';
+import { ESLint } from 'eslint';
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { createSequelize } from '../support/helper';
 
 const repositoryFile = (filePath) =>
   readFileSync(path.resolve(filePath), 'utf8');
+const repositoryJson = (filePath) => JSON.parse(repositoryFile(filePath));
 const packageJson = JSON.parse(repositoryFile('package.json'));
 
 describe('continuous integration configuration', function () {
@@ -81,6 +83,99 @@ describe('continuous integration configuration', function () {
     expect(packageJson.scripts.lint).to.equal(
       'eslint src test scripts/*.cjs'
     );
+  });
+
+  it('compiles production and maintained test sources with TypeScript', function () {
+    const buildConfig = repositoryJson('tsconfig.build.json');
+    const testConfig = repositoryJson('tsconfig.test.json');
+
+    expect(buildConfig).to.deep.equal({
+      compilerOptions: {
+        allowJs: true,
+        checkJs: false,
+        declaration: true,
+        declarationMap: true,
+        esModuleInterop: true,
+        forceConsistentCasingInFileNames: true,
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        noEmitOnError: true,
+        outDir: 'lib',
+        rootDir: 'src',
+        skipLibCheck: false,
+        sourceMap: true,
+        strict: true,
+        target: 'ES2022'
+      },
+      include: ['src/**/*.js', 'src/**/*.ts']
+    });
+    expect(testConfig).to.deep.equal({
+      extends: './tsconfig.build.json',
+      compilerOptions: {
+        allowJs: true,
+        declaration: false,
+        declarationMap: false,
+        outDir: '.build',
+        rootDir: '.'
+      },
+      include: [
+        'src/**/*',
+        'test/unit/**/*.js',
+        'test/integration/**/*.js',
+        'test/support/**/*.js'
+      ]
+    });
+    expect(packageJson.type).to.equal('commonjs');
+    expect(packageJson.main).to.equal('lib/index.js');
+    expect(packageJson.types).to.equal('types/index.d.ts');
+    expect(packageJson.scripts.build).to.equal(
+      'node scripts/clean-build.cjs && tsc -p tsconfig.build.json'
+    );
+    expect(packageJson.scripts['build:test']).to.equal(
+      'rm -rf .build && tsc -p tsconfig.test.json'
+    );
+    expect(packageJson.scripts.build).not.to.match(/\bbabel\b/i);
+    expect(packageJson.scripts['build:test']).not.to.match(/\bbabel\b/i);
+    expect(existsSync(path.resolve('eslint.config.cjs'))).to.equal(true);
+    expect(existsSync(path.resolve('eslint.config.js'))).to.equal(false);
+  });
+
+  it('applies TypeScript-aware lint rules only to source TypeScript', async function () {
+    const eslint = new ESLint();
+    const sourceConfig = await eslint.calculateConfigForFile('src/example.ts');
+    const testConfig = await eslint.calculateConfigForFile(
+      'test/types/public-api.test.ts'
+    );
+
+    expect(sourceConfig).not.to.equal(undefined);
+    expect(sourceConfig.languageOptions.parser.meta.name).to.equal(
+      'typescript-eslint/parser'
+    );
+    expect(sourceConfig.rules['no-undef'][0]).to.equal(0);
+    expect(sourceConfig.rules['no-redeclare'][0]).to.equal(0);
+    expect(sourceConfig.rules['no-array-constructor'][0]).to.equal(0);
+    expect(sourceConfig.rules['no-unused-vars'][0]).to.equal(0);
+    expect(sourceConfig.rules['@typescript-eslint/no-array-constructor'][0])
+      .to.equal(2);
+    expect(sourceConfig.rules['@typescript-eslint/no-unused-vars'][0])
+      .to.equal(2);
+    expect(sourceConfig.rules['@typescript-eslint/no-explicit-any'][0])
+      .to.equal(2);
+    expect(testConfig).to.equal(undefined);
+  });
+
+  it('allows valid TypeScript declaration merging', async function () {
+    const eslint = new ESLint();
+    const [result] = await eslint.lintText(
+      [
+        'interface Entity { id: string; }',
+        'interface Entity { name: string; }',
+        "export const entity: Entity = { id: '1', name: 'Ada' };"
+      ].join('\n') + '\n',
+      { filePath: 'src/declarationMerging.ts' }
+    );
+
+    expect(result.messages).to.deep.equal([]);
   });
 
   it('keeps database failure artifacts inside an explicitly safe root', function () {

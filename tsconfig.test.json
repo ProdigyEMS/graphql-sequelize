@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "declaration": false,
+    "declarationMap": false,
+    "outDir": ".build",
+    "rootDir": "."
+  },
+  "include": [
+    "src/**/*",
+    "test/unit/**/*.js",
+    "test/integration/**/*.js",
+    "test/support/**/*.js"
+  ]
+}

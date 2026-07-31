@@ -11,7 +11,7 @@
     "prepublishOnly": "npm run check && npm run test:package",
     "check": "npm run lint && npm run test:types && npm run test:inventory && npm run test:unit",
     "lint": "eslint src test scripts/*.cjs",
-    "build": "node scripts/clean-build.cjs && babel src --ignore test --out-dir lib",
+    "build": "node scripts/clean-build.cjs && tsc -p tsconfig.build.json",
     "test": "npm run lint && npm run test:types && npm run test:unit && DIALECT=sqlite npm run test:integration && npm run test:package",
     "test:watch": "npm run test:unit -- --watch",
     "test:unit": "npm run build:test && mocha \".build/test/unit/**/*.test.js\"",
@@ -24,7 +24,7 @@
     "test:integration": "npm run build:test && node scripts/run-integration.cjs",
     "psql": "docker run -it --link graphqlsequelize_postgres_1:postgres --rm postgres:9.4 sh -c 'PGPASSWORD=graphql_sequelize_test exec psql -h \"$POSTGRES_PORT_5432_TCP_ADDR\" -p \"$POSTGRES_PORT_5432_TCP_PORT\" -U graphql_sequelize_test'",
     "cover": "npm run build:test && c8 --reporter=text --reporter=lcov mocha \".build/test/unit/**/*.test.js\"",
-    "build:test": "rm -rf .build && babel src --out-dir .build/src && babel test --out-dir .build/test --ignore test/benchmark"
+    "build:test": "rm -rf .build && tsc -p tsconfig.test.json"
   },
   "repository": {
     "type": "git",
@@ -85,7 +85,8 @@
     "sinon-chai": "^3.7.0",
     "sqlite3": "^6.0.1",
     "tedious": "^20.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0"
   },
   "directories": {
     "doc": "docs",

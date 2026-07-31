@@ -3,6 +3,8 @@
 const { rmSync } = require('node:fs');
 const path = require('node:path');
 
-const buildDirectory = path.resolve(__dirname, '..', 'lib');
+const typescriptBuildDirectory = path.resolve(__dirname, '..', 'lib');
 
-rmSync(buildDirectory, { force: true, recursive: true });
+// JavaScript, source maps, declarations, and declaration maps are all emitted
+// beneath lib, so removing the directory also prevents stale TypeScript output.
+rmSync(typescriptBuildDirectory, { force: true, recursive: true });
