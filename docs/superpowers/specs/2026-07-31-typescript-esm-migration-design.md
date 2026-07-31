@@ -201,8 +201,8 @@ Required consumer checks are:
 6. a built-artifact startup smoke test using `node build/src/server.js` with a
    controlled test environment;
 7. mandatory `pnpm --dir frontend validate`; and
-8. targeted reporting and organization-reporting Cypress specs against the
-   real Docker stack.
+8. `cypress/e2e/reporting_spec.ts` and
+   `cypress/e2e/organization_reporting_spec.ts` against the real Docker stack.
 
 The startup smoke test must distinguish successful module loading from the
 expected absence of external services. A syntax error, missing ESM export,
@@ -210,8 +210,9 @@ unsupported directory import, or `ERR_REQUIRE_ESM` is always a failure.
 
 ## Coordinated Validation and Release
 
-1. Complete the library conversion on an isolated branch without publishing.
-2. Record the immutable library commit under test.
+1. Complete the library conversion and finalize the `2.0.0` package and
+   changelog metadata on an isolated branch without publishing.
+2. Record the immutable, release-ready library commit under test.
 3. Point Unicorn at that Git commit. Temporarily allow the package's Git
    `prepare` build in pnpm configuration, as required for source dependencies.
 4. Complete the Unicorn ESM conversion and run all consumer checks.
@@ -220,16 +221,24 @@ unsupported directory import, or `ERR_REQUIRE_ESM` is always a failure.
 6. Open both PRs with the consumer PR explicitly dependent on the library PR
    and, if necessary, Prodigy PR #13867.
 7. Merge the library only after both repositories pass against the immutable
-   commit.
-8. Prepare and publish npm version `2.0.0` under the `next` dist-tag from the
-   reviewed release commit. Use the fork-specific `prodigy-v2.0.0` signed Git
+   commit. The merge must preserve that commit as an ancestor of
+   `origin/master`. Publish and tag from the validated commit, not merely the
+   post-merge branch tip. If squash or rebase merging rewrites the commit,
+   record the resulting release commit and repeat the complete library and
+   Git-backed consumer validation before publishing.
+8. Publish npm version `2.0.0` under the `next` dist-tag from that exact
+   validated release commit. Use the fork-specific `prodigy-v2.0.0` signed Git
    tag; never replace the inherited upstream `v2.0.0` tag.
 9. Replace Unicorn's Git dependency and temporary build allowance with exact
-   registry version `2.0.0` and regenerate the lockfile.
-10. Verify registry integrity, frozen installation, all consumer checks, and
-    the targeted E2E specs again.
+   registry version `2.0.0`, replace the exact 1.0.0 pnpm
+   `minimumReleaseAgeExclude` entry with an exact 2.0.0 entry, and regenerate
+   the lockfile. This project-owned exact-version exception permits immediate
+   local registry verification; it does not bypass CircleCI Safe Chain's
+   independent package-age policy.
+10. Verify registry integrity, frozen local installation, all consumer checks,
+    and both targeted E2E specs again.
 11. Let Safe Chain's package-age quarantine expire and rerun the blocked jobs;
-    do not bypass the policy.
+    do not disable or bypass that policy.
 12. Promote `2.0.0` from `next` to `latest` and merge the consumer only after
     registry-backed CI passes.
 
