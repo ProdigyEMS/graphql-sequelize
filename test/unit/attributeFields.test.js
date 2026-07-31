@@ -296,6 +296,31 @@ describe('attributeFields', function () {
 
   });
 
+  it('should replace an incompatible scalar enum cache entry', function () {
+    const typeName = `${Model.name}enumEnumType`;
+    const cache = {
+      [typeName]: GraphQLString
+    };
+
+    const fields = attributeFields(Model, {cache});
+
+    expect(cache[typeName]).to.be.an.instanceOf(GraphQLEnumType);
+    expect(fields.enum.type).to.equal(cache[typeName]);
+  });
+
+  it('should replace an incompatible list enum cache entry', function () {
+    const typeName = `${Model.name}enumArrayEnumType`;
+    const cache = {
+      [typeName]: GraphQLString
+    };
+
+    const fields = attributeFields(Model, {cache});
+
+    expect(cache[typeName]).to.be.an.instanceOf(GraphQLEnumType);
+    expect(fields.enumArray.type).to.be.an.instanceOf(GraphQLList);
+    expect(fields.enumArray.type.ofType).to.equal(cache[typeName]);
+  });
+
   describe('with non-default primary key', function () {
     var ModelWithoutId;
     var modelName = Math.random().toString();

@@ -1,12 +1,19 @@
 import type {
+  GraphQLFieldConfigArgumentMap,
+  GraphQLFieldConfigMap,
   GraphQLFieldResolver,
   GraphQLResolveInfo,
-  GraphQLScalarType
+  GraphQLScalarType,
+  GraphQLType
 } from 'graphql';
 import { GraphQLObjectType, GraphQLString } from 'graphql';
 import type { FindOptions, Model, ModelStatic } from 'sequelize';
 import { DataTypes } from 'sequelize';
 import type { ConnectionResult } from '../..';
+import generatedAttributeFields from '../../lib/attributeFields.js';
+import type { AttributeFieldsOptions as GeneratedAttributeFieldsOptions } from '../../lib/attributeFields.js';
+import generatedDefaultArgs from '../../lib/defaultArgs.js';
+import generatedDefaultListArgs from '../../lib/defaultListArgs.js';
 import * as generatedTypeMapper from '../../lib/typeMapper.js';
 
 import {
@@ -37,6 +44,7 @@ interface ConnectionArgs {
 
 declare const User: ModelStatic<Model>;
 declare const info: GraphQLResolveInfo;
+declare const graphqlTypeCache: Record<string, GraphQLType>;
 
 const sequelize = User.sequelize;
 if (!sequelize) {
@@ -67,6 +75,26 @@ const findOptions: FindOptions = argsToFindOptions(
 const listArgs = defaultListArgs();
 const modelArgs = defaultArgs(User);
 const fields = attributeFields(User, { exclude: ['secret'] });
+const generatedOptions: GeneratedAttributeFieldsOptions = {
+  cache: graphqlTypeCache,
+  exclude: (attributeName) => attributeName === 'secret',
+  only: ['id', 'email'],
+  map: (attributeName) => `mapped_${attributeName}`,
+  globalId: true,
+  allowNull: true,
+  commentToDescription: true
+};
+const generatedRecordOptions: GeneratedAttributeFieldsOptions = {
+  map: { id: 'mappedId' }
+};
+const generatedFields: GraphQLFieldConfigMap<Model, unknown> =
+  generatedAttributeFields(User, generatedOptions);
+const generatedRecordFields: GraphQLFieldConfigMap<Model, unknown> =
+  generatedAttributeFields(User, generatedRecordOptions);
+const generatedModelArgs: GraphQLFieldConfigArgumentMap =
+  generatedDefaultArgs(User);
+const generatedListArgs: GraphQLFieldConfigArgumentMap =
+  generatedDefaultListArgs();
 const simplified = simplifyAST(info.fieldNodes, info);
 const mappedType = typeMapper.toGraphQL(
   User.getAttributes().id.type,
@@ -152,6 +180,10 @@ void findOptions;
 void listArgs;
 void modelArgs;
 void fields;
+void generatedFields;
+void generatedRecordFields;
+void generatedModelArgs;
+void generatedListArgs;
 void simplified;
 void mappedType;
 void generatedMappedType;

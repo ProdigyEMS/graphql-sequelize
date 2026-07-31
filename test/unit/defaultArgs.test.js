@@ -4,6 +4,7 @@
 import {expect} from 'chai';
 import Sequelize from 'sequelize';
 import defaultArgs from '../../src/defaultArgs';
+import {mapType} from '../../src/typeMapper';
 import DateType from '../../src/types/dateType';
 
 import { sequelize } from '../support/helper';
@@ -11,6 +12,7 @@ import { sequelize } from '../support/helper';
 import {
   GraphQLString,
   GraphQLInt,
+  GraphQLObjectType,
   GraphQLScalarType
 } from 'graphql';
 
@@ -94,6 +96,29 @@ describe('defaultArgs', function () {
 
     expect(args.userId.type).to.equal(GraphQLInt);
     expect(args.timestamp.type).to.equal(DateType);
+  });
+
+  it('should reject primary keys mapped to output-only GraphQL types', function () {
+    const Model = sequelize.define('DefaultArgInvalidTypeModel', {});
+    const invalidType = new GraphQLObjectType({
+      name: 'DefaultArgInvalidType',
+      fields: {
+        value: {
+          type: GraphQLString
+        }
+      }
+    });
+
+    mapType(() => invalidType);
+
+    try {
+      expect(() => defaultArgs(Model)).to.throw(
+        TypeError,
+        'Primary key attribute "id" on model "DefaultArgInvalidTypeModel" must map to a GraphQL input type.'
+      );
+    } finally {
+      mapType(null);
+    }
   });
 
   describe('will have an "where" argument', function () {
