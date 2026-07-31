@@ -88,7 +88,6 @@
   },
   "directories": {
     "doc": "docs",
-    "example": "examples",
     "test": "test"
   },
   "engines": {
