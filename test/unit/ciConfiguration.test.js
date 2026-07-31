@@ -56,6 +56,10 @@ describe('continuous integration configuration', function () {
   });
 
   it('keeps the default test command local and isolated', function () {
+    expect(packageJson.scripts.check).to.equal(
+      'npm run lint && npm run test:types && npm run test:inventory && ' +
+        'npm run test:unit'
+    );
     expect(packageJson.scripts.test).to.equal(
       'npm run lint && npm run test:types && npm run test:unit && ' +
         'DIALECT=sqlite npm run test:integration && npm run test:package'

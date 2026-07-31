@@ -17,7 +17,8 @@ describe('package metadata', function () {
 
   it('runs the package-owned type contract during check', function () {
     expect(packageJson.scripts.check).to.equal(
-      'npm run lint && npm run test:types && npm run test:unit'
+      'npm run lint && npm run test:types && npm run test:inventory && ' +
+        'npm run test:unit'
     );
   });
 });
