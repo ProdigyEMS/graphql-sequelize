@@ -322,10 +322,13 @@ describe('regressions', function () {
         '{ users { name taskConnection(first: 2) { edges { node { title } } } } }'
       );
 
-      data.users.forEach((user) => {
-        const expected = user.name === 'alice' ? 2 : 2;
-        expect(user.taskConnection.edges).to.have.length(expected);
-      });
+      const connectionSizesByUser = Object.fromEntries(
+        data.users.map((user) => [
+          user.name,
+          user.taskConnection.edges.length
+        ])
+      );
+      expect(connectionSizesByUser).to.deep.equal({alice: 2, bob: 2});
     });
 
     it('reports a total count that is not inflated by the join', async function () {
@@ -443,6 +446,31 @@ describe('regressions', function () {
       );
 
       expect(result).to.deep.equal([]);
+    });
+
+    it('transforms an empty limited association as a connection', async function () {
+      const parent = await loadParentWithReversedChildren(
+        this.User,
+        this.Task,
+        this.User.Tasks,
+        this.user.id
+      );
+      let connectionPassedToAfter;
+      const transformedResult = await resolver(this.User.Tasks, {
+        after(connection) {
+          connectionPassedToAfter = connection;
+
+          return {edgeCount: connection.edges.length};
+        }
+      })(
+        parent,
+        {limit: 0},
+        {},
+        resolveInfo(this.plainTaskConnection.connectionType)
+      );
+
+      expect(connectionPassedToAfter.edges).to.deep.equal([]);
+      expect(transformedResult).to.deep.equal({edgeCount: 0});
     });
 
     it('does not reorder the parent instance in place', async function () {

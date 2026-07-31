@@ -1,38 +1,93 @@
-dev:
-  build: .
-  links:
-  - postgres
-  - mysql
-  volumes:
-  - .:/src/graphql-sequelize
-  environment:
-    DIALECT: "${DIALECT}"
+services:
+  dev:
+    build: .
+    links:
+      - postgres
+      - mysql
+    volumes:
+      - .:/src/graphql-sequelize
+    environment:
+      DIALECT: "${DIALECT:-postgres}"
 
-postgres:
-  image: postgres:9.4
-  environment:
-    POSTGRES_USER: graphql_sequelize_test
-    POSTGRES_PASSWORD: graphql_sequelize_test
+  postgres:
+    image: postgres:16
+    ports:
+      - name: postgres
+        target: 5432
+        published: "${POSTGRES_HOST_PORT:-0}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    environment:
+      POSTGRES_USER: graphql_sequelize_test
+      POSTGRES_PASSWORD: graphql_sequelize_test
+      POSTGRES_DB: graphql_sequelize_test
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
-mysql:
-  image: mysql:5.6
-  environment:
-    MYSQL_USER: test
-    MYSQL_PASSWORD: test
-    MYSQL_DATABASE: test
-    MYSQL_ALLOW_EMPTY_PASSWORD: 1
+  mysql:
+    image: mysql:8.0
+    ports:
+      - name: mysql
+        target: 3306
+        published: "${MYSQL_HOST_PORT:-0}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+      MYSQL_DATABASE: test
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
 
-benchmark_server:
-  build: .
-  command: [node, test/benchmark.js]
-  ports:
-  - "4001:4001"
-  links:
-  - postgres
-  volumes:
-  - .:/src/graphql-sequelize
-  environment:
-    DIALECT: postgres
-    DB_DATABASE: graphql_sequelize_test
-    DB_USER: graphql_sequelize_test
-    DB_PASSWORD: graphql_sequelize_test
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    ports:
+      - name: mssql
+        target: 1433
+        published: "${MSSQL_HOST_PORT:-0}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "GqlSeq!Test123"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -b -Q "SELECT 1" >/dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  benchmark_server:
+    build: .
+    command: [node, test/benchmark.js]
+    ports:
+      - name: benchmark
+        target: 4001
+        published: "${BENCHMARK_HOST_PORT:-0}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    links:
+      - postgres
+    volumes:
+      - .:/src/graphql-sequelize
+    environment:
+      DIALECT: postgres
+      DB_DATABASE: graphql_sequelize_test
+      DB_USER: graphql_sequelize_test
+      DB_PASSWORD: graphql_sequelize_test

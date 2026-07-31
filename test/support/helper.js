@@ -19,12 +19,14 @@ export function createSequelize(options = {}) {
     },
     dialect === 'postgres' && {
       host: env.POSTGRES_PORT_5432_TCP_ADDR,
+      port: env.POSTGRES_PORT_5432_TCP_PORT,
       user: env.POSTGRES_ENV_POSTGRES_USER,
       password: env.POSTGRES_ENV_POSTGRES_PASSWORD,
       database: env.POSTGRES_ENV_POSTGRES_DATABASE
     },
     dialect === 'mysql' && {
       host: env.MYSQL_PORT_3306_TCP_ADDR,
+      port: env.MYSQL_PORT_3306_TCP_PORT,
       user: env.MYSQL_ENV_MYSQL_USER,
       password: env.MYSQL_ENV_MYSQL_PASSWORD,
       database: env.MYSQL_ENV_MYSQL_DATABASE
@@ -34,6 +36,7 @@ export function createSequelize(options = {}) {
     // the one the suite most needs to cover.
     dialect === 'mssql' && {
       host: env.MSSQL_PORT_1433_TCP_ADDR,
+      port: env.MSSQL_PORT_1433_TCP_PORT,
       user: env.MSSQL_ENV_MSSQL_USER,
       password: env.MSSQL_ENV_MSSQL_PASSWORD,
       database: env.MSSQL_ENV_MSSQL_DATABASE
@@ -52,6 +55,7 @@ export function createSequelize(options = {}) {
 
   const sequelize = new Sequelize(config.database, config.user, config.password, {
     host: config.host,
+    port: config.port,
     dialect: dialect,
     // Set SEQUELIZE_LOGGING=1 to see generated SQL when diagnosing failures.
     logging: env.SEQUELIZE_LOGGING ? console.log : false,

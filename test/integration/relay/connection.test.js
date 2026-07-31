@@ -30,6 +30,47 @@ import {
   fromGlobalId
 } from 'graphql-relay';
 
+/**
+ * Fail a GraphQL integration query with the underlying database message and
+ * the ordered SQL that triggered it.
+ *
+ * @param {Object} result GraphQL execution result
+ * @param {Function} sqlSpy query logger spy
+ * @return {void}
+ */
+function throwOnGraphQlErrors(result, sqlSpy) {
+  if (!result.errors) {
+    return;
+  }
+
+  const graphQlError = result.errors[0];
+  const originalError = graphQlError.originalError || graphQlError;
+  const databaseError = originalError.parent || originalError.original || originalError;
+  const loggedSql = sqlSpy.args.map(([sql]) => sql);
+  const orderSql = loggedSql.find((sql) => sql.includes('NULLS')) ||
+    [...loggedSql].reverse().find((sql) => sql.includes('ORDER BY'));
+
+  throw new Error(`${databaseError.message}\nSQL: ${orderSql || 'unavailable'}`);
+}
+
+/**
+ * Return the qualified task column as emitted by the active dialect.
+ *
+ * @param {String} dialect sequelize dialect name
+ * @param {String} column task column name
+ * @return {String} qualified and quoted column
+ */
+function quotedTaskColumn(dialect, column) {
+  if (dialect === 'mssql') {
+    return `[task].[${column}]`;
+  }
+  if (dialect === 'postgres') {
+    return `"task"."${column}"`;
+  }
+
+  return `\`task\`.\`${column}\``;
+}
+
 describe('relay', function () {
   describe('connection', function () {
     beforeRemoveAllTables();
@@ -630,21 +671,27 @@ describe('relay', function () {
     });
 
     it('should properly reverse orderBy with NULLS and last', async () => {
-      let sqlSpy = sinon.spy();
-      await graphql({
-        schema: this.schema,
-        source: `
-          {
-            user(id: ${this.userA.id}) {
-              projects(first: 1) {
-                edges {
-                  node {
-                    tasks(orderBy: NAME_NULLS_LAST, last: 10) {
-                      edges {
-                        cursor
-                        node {
-                          id
-                          name
+      const task = await this.Task.findByPk(1);
+      const originalName = task.name;
+      const sqlSpy = sinon.spy();
+      let result;
+
+      try {
+        await task.update({name: null});
+        result = await graphql({
+          schema: this.schema,
+          source: `
+            {
+              user(id: ${this.userA.id}) {
+                projects(first: 1) {
+                  edges {
+                    node {
+                      tasks(orderBy: NAME_NULLS_LAST, last: 3) {
+                        edges {
+                          node {
+                            id
+                            name
+                          }
                         }
                       }
                     }
@@ -652,12 +699,118 @@ describe('relay', function () {
                 }
               }
             }
-          }
-        `,
-        contextValue: { logging: sqlSpy },
-      });
+          `,
+          contextValue: {logging: sqlSpy},
+        });
+      } finally {
+        await task.update({name: originalName});
+      }
 
-      expect(sqlSpy.lastCall.args[0].match('DESC NULLS LAST')).to.be.ok;
+      throwOnGraphQlErrors(result, sqlSpy);
+
+      const taskIds = result.data.user.projects.edges[0].node.tasks.edges
+        .map(({node}) => Number(fromGlobalId(node.id).id));
+      expect(taskIds).to.deep.equal([1, 12, 11]);
+
+      const dialect = sequelize.dialect.name;
+      const quotedTaskName = quotedTaskColumn(dialect, 'name');
+      const quotedTaskId = quotedTaskColumn(dialect, 'id');
+      const orderSql = sqlSpy.args
+        .map(([sql]) => sql)
+        .find((sql) => (
+          sql.includes('ORDER BY') && sql.includes(quotedTaskName)
+        ));
+      expect(orderSql).to.not.equal(undefined);
+
+      if (['mssql', 'mysql'].includes(dialect)) {
+        expect(orderSql).to.include(
+          `CASE WHEN ${quotedTaskName} IS NULL THEN 0 ELSE 1 END ASC`
+        );
+        expect(orderSql).to.include(`${quotedTaskName} DESC`);
+        expect(orderSql).to.include(`${quotedTaskId} DESC`);
+        expect(orderSql).to.not.include('NULLS FIRST');
+      } else {
+        expect(orderSql).to.include(`${quotedTaskName} DESC NULLS FIRST`);
+        expect(orderSql).to.include(`${quotedTaskId} DESC`);
+        expect(orderSql).to.not.include('CASE WHEN');
+      }
+    });
+
+    it('puts nulls last across dialects', async () => {
+      const task = await this.Task.findByPk(1);
+      const originalName = task.name;
+      const sqlSpy = sinon.spy();
+      let result;
+
+      try {
+        await task.update({name: null});
+        result = await graphql({
+          schema: this.schema,
+          source: `
+            {
+              user(id: ${this.userA.id}) {
+                projects(first: 1) {
+                  edges {
+                    node {
+                      tasks(orderBy: NAME_NULLS_LAST, first: 10) {
+                        edges {
+                          node {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          `,
+          contextValue: {logging: sqlSpy},
+        });
+      } finally {
+        await task.update({name: originalName});
+      }
+
+      throwOnGraphQlErrors(result, sqlSpy);
+
+      const tasks = result.data.user.projects.edges[0].node.tasks.edges
+        .map(({node}) => ({
+          id: Number(fromGlobalId(node.id).id),
+          name: node.name
+        }));
+      expect(tasks).to.deep.equal([
+        {id: 2, name: 'ABA'},
+        {id: 3, name: 'ABC'},
+        {id: 4, name: 'ABC'},
+        {id: 5, name: 'BAA'},
+        {id: 10, name: 'ZAA'},
+        {id: 11, name: 'ZAB'},
+        {id: 12, name: 'ZAC'},
+        {id: 1, name: null}
+      ]);
+
+      const dialect = sequelize.dialect.name;
+      const quotedTaskName = quotedTaskColumn(dialect, 'name');
+      const quotedTaskId = quotedTaskColumn(dialect, 'id');
+      const orderSql = sqlSpy.args
+        .map(([sql]) => sql)
+        .find((sql) => (
+          sql.includes('ORDER BY') && sql.includes(quotedTaskName)
+        ));
+
+      if (['mssql', 'mysql'].includes(dialect)) {
+        expect(orderSql).to.include(
+          `CASE WHEN ${quotedTaskName} IS NULL THEN 1 ELSE 0 END ASC`
+        );
+        expect(orderSql).to.include(`${quotedTaskName} ASC`);
+        expect(orderSql).to.include(`${quotedTaskId} ASC`);
+        expect(orderSql).to.not.include('NULLS LAST');
+      } else {
+        expect(orderSql).to.include(`${quotedTaskName} ASC NULLS LAST`);
+        expect(orderSql).to.include(`${quotedTaskId} ASC`);
+        expect(orderSql).to.not.include('CASE WHEN');
+      }
     });
 
     it('should support in-query slicing and pagination with first and orderBy', async () => {

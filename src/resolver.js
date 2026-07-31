@@ -108,6 +108,23 @@ function resolvesToConnection(graphqlType, associationName) {
 }
 
 /**
+ * Apply the resolver's normal connection transformation to association rows.
+ *
+ * @param {Array} result association rows
+ * @param {Object} args resolver arguments
+ * @param {Object} options resolver options
+ * @param {Object} info GraphQL resolve information
+ * @return {Array|Object} raw rows or a Relay connection
+ */
+function transformAssociationResult(result, args, options, info) {
+  if (options.handleConnection && isConnection(info.returnType)) {
+    return handleConnection(result, args);
+  }
+
+  return result;
+}
+
+/**
  * `models` and `requiredFilters` belong in the options object, preserving the
  * upstream resolver(target, options) shape.
  *
@@ -305,6 +322,15 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
         }
 
         if (association) {
+          // Sequelize's MSSQL query generator omits LIMIT/OFFSET entirely when
+          // limit is zero, turning an empty-page request into an unbounded
+          // query. Resolve the dialect-independent result before calling the
+          // association getter, while leaving the outer `after` callback in
+          // the promise chain.
+          if (findOptions.limit === 0) {
+            return transformAssociationResult([], args, options, info);
+          }
+
           // A preloaded association can only be used verbatim when this
           // resolver has no constraints of its own to apply. If it does -- a
           // limit from first/last, or a where built from args -- returning the
@@ -334,19 +360,13 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
             // one, so an unordered join is not merely inconsistent -- it makes
             // pagination return the wrong rows. See orderByPrimaryKey.
             const result = orderByPrimaryKey(source[association.as], model);
-            if (options.handleConnection && isConnection(info.returnType)) {
-              return handleConnection(result, args);
-            }
 
-            return result;
+            return transformAssociationResult(result, args, options, info);
           } else {
             return source[association.accessors.get](findOptions).then(function(
               result
             ) {
-              if (options.handleConnection && isConnection(info.returnType)) {
-                return handleConnection(result, args);
-              }
-              return result;
+              return transformAssociationResult(result, args, options, info);
             });
           }
         }

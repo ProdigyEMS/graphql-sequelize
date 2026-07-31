@@ -132,6 +132,56 @@ export function nodeType(connectionType) {
   return connectionType._fields.edges.type.ofType._fields.node.type;
 }
 
+/**
+ * Build sequelize order terms for dialects that do not accept the SQL
+ * NULLS FIRST/LAST suffix.
+ *
+ * @param {Model} model sequelize model being ordered
+ * @param {String|Object} orderAttribute requested order attribute
+ * @param {String} orderDirection requested direction and null placement
+ * @return {Array} sequelize order terms
+ */
+function normalizeNullOrdering(model, orderAttribute, orderDirection) {
+  const dialect = model.sequelize.dialect.name;
+  const nullOrder = /^(ASC|DESC) NULLS (FIRST|LAST)$/.exec(orderDirection);
+
+  if (
+    !['mssql', 'mysql'].includes(dialect) ||
+    typeof orderAttribute !== 'string' ||
+    !nullOrder
+  ) {
+    return [[orderAttribute, orderDirection]];
+  }
+
+  const [, direction, nullPlacement] = nullOrder;
+  const usesNativeNullOrder =
+    (direction === 'ASC' && nullPlacement === 'FIRST') ||
+    (direction === 'DESC' && nullPlacement === 'LAST');
+
+  if (usesNativeNullOrder) {
+    return [[orderAttribute, direction]];
+  }
+
+  const queryInterface = model.sequelize.getQueryInterface();
+  const queryGenerator =
+    queryInterface.queryGenerator || queryInterface.QueryGenerator;
+  const attribute = model.getAttributes()[orderAttribute];
+  const columnName = attribute ? attribute.field : orderAttribute;
+  const qualifiedColumn =
+    `${queryGenerator.quoteIdentifier(model.name)}.` +
+    `${queryGenerator.quoteIdentifier(columnName)}`;
+  const nullRank = nullPlacement === 'FIRST' ? 0 : 1;
+  const nonNullRank = nullRank === 0 ? 1 : 0;
+  const rankExpression = model.sequelize.literal(
+    `CASE WHEN ${qualifiedColumn} IS NULL THEN ${nullRank} ELSE ${nonNullRank} END`
+  );
+
+  return [
+    [rankExpression, 'ASC'],
+    [orderAttribute, direction]
+  ];
+}
+
 export function createConnectionResolver({
   target: targetMaybeThunk,
   before,
@@ -148,12 +198,26 @@ export function createConnectionResolver({
   };
 
   let orderByDirection = function (orderDirection, args) {
-    if (args.last) {
-      return orderDirection.indexOf('ASC') >= 0
-        ? orderDirection.replace('ASC', 'DESC')
-        : orderDirection.replace('DESC', 'ASC');
+    if (!args.last) {
+      return orderDirection;
     }
-    return orderDirection;
+
+    const parsedDirection =
+      /^(ASC|DESC)(?: NULLS (FIRST|LAST))?$/.exec(orderDirection);
+    if (!parsedDirection) {
+      return orderDirection;
+    }
+
+    const [, direction, nullPlacement] = parsedDirection;
+    const reversedDirection = direction === 'ASC' ? 'DESC' : 'ASC';
+    if (!nullPlacement) {
+      return reversedDirection;
+    }
+
+    const reversedNullPlacement =
+      nullPlacement === 'FIRST' ? 'LAST' : 'FIRST';
+
+    return `${reversedDirection} NULLS ${reversedNullPlacement}`;
   };
 
   /**
@@ -247,9 +311,11 @@ export function createConnectionResolver({
       });
       let orderDirection = orderByDirection(orderBy[0][1], args);
 
-      options.order = [
-        [orderAttribute, orderDirection]
-      ];
+      options.order = normalizeNullOrdering(
+        model,
+        orderAttribute,
+        orderDirection
+      );
 
       if (orderAttribute !== model.primaryKeyAttribute) {
         options.order.push([model.primaryKeyAttribute, orderByDirection('ASC', args)]);
