@@ -7,6 +7,7 @@ import sinon from 'sinon';
 import Sequelize, { Op } from 'sequelize';
 
 import resolver from '../../src/resolver';
+import { createConnection } from '../../src/relay';
 import JSONType from '../../src/types/jsonType';
 
 import {
@@ -1363,6 +1364,1748 @@ describe('resolver', function () {
 
       expect(result.data.users).to.have.length(1);
       expect(result.data.users[0].name).to.equal(user.name);
+    });
+  });
+
+  describe('update operation', function () {
+    let UpdateUser;
+    let updateInfo;
+
+    before(async function () {
+      UpdateUser = sequelize.define('resolverUpdateUser', {
+        name: Sequelize.STRING,
+        status: Sequelize.STRING,
+        scheduledAt: Sequelize.DATE
+      }, {
+        timestamps: false
+      });
+      markFilterable(UpdateUser, 'id');
+      await UpdateUser.sync({ force: true });
+
+      updateInfo = {
+        returnType: new GraphQLObjectType({
+          name: 'ResolverUpdateUser',
+          fields: {
+            id: { type: GraphQLInt },
+            name: { type: GraphQLString },
+            status: { type: GraphQLString }
+          }
+        }),
+        variableValues: {}
+      };
+    });
+
+    beforeEach(async function () {
+      await UpdateUser.destroy({ where: {} });
+      this.updateUser = await UpdateUser.create({
+        name: 'before-update',
+        status: 'active',
+        scheduledAt: new Date('2026-07-31T12:34:56.000Z')
+      });
+    });
+
+    it('updates a direct model through Sequelize', async function () {
+      const resolveUpdate = resolver(UpdateUser, { operation: 'update' });
+
+      await resolveUpdate(
+        null,
+        {
+          where: { id: this.updateUser.id },
+          data: { name: 'after-update' }
+        },
+        {},
+        updateInfo
+      );
+
+      const persisted = await UpdateUser.findByPk(this.updateUser.id);
+      expect(persisted.name).to.equal('after-update');
+      expect(persisted.status).to.equal('active');
+    });
+
+    it('updates a model returned by a target thunk', async function () {
+      const resolveUpdate = resolver(
+        async () => UpdateUser,
+        { operation: 'update' }
+      );
+
+      const result = await resolveUpdate(
+        null,
+        {
+          where: { id: this.updateUser.id },
+          data: { status: 'inactive' }
+        },
+        {},
+        updateInfo
+      );
+
+      expect(result.status).to.equal('inactive');
+    });
+
+    it('treats update values as bound data rather than SQL', async function () {
+      const resolveUpdate = resolver(UpdateUser, { operation: 'update' });
+      const unsafeValue = "quoted'value, status = 'changed' --";
+
+      const result = await resolveUpdate(
+        null,
+        {
+          where: { id: this.updateUser.id },
+          data: { name: unsafeValue }
+        },
+        {},
+        updateInfo
+      );
+
+      expect(result.name).to.equal(unsafeValue);
+      expect(result.status).to.equal('active');
+    });
+
+    it('propagates transaction and compatible find options to update', async function () {
+      const transaction = await sequelize.transaction();
+      const logging = sinon.spy();
+      const update = sinon.spy(UpdateUser, 'update');
+      const resolveUpdate = resolver(UpdateUser, {
+        operation: 'update',
+        before(options) {
+          options.transaction = transaction;
+          options.logging = logging;
+          options.paranoid = false;
+          options.hooks = false;
+          options.silent = true;
+          options.offset = 0;
+          options.order = [['id', 'DESC']];
+          options.include = [];
+
+          return options;
+        }
+      });
+
+      try {
+        const result = await resolveUpdate(
+          null,
+          {
+            where: { id: this.updateUser.id },
+            data: { name: 'inside-transaction' }
+          },
+          {},
+          updateInfo
+        );
+        const updateOptions = update.firstCall.args[1];
+
+        expect(result.name).to.equal('inside-transaction');
+        expect(updateOptions.transaction).to.equal(transaction);
+        expect(updateOptions.logging).to.equal(logging);
+        expect(updateOptions.paranoid).to.equal(false);
+        expect(updateOptions.hooks).to.equal(false);
+        expect(updateOptions.silent).to.equal(true);
+        expect(updateOptions).to.not.have.property('attributes');
+        expect(updateOptions).to.not.have.property('include');
+        expect(updateOptions).to.not.have.property('offset');
+        expect(updateOptions).to.not.have.property('order');
+      } finally {
+        update.restore();
+        await transaction.rollback();
+      }
+
+      const persisted = await UpdateUser.findByPk(this.updateUser.id);
+      expect(persisted.name).to.equal('before-update');
+    });
+
+    it('returns the row read after the update', async function () {
+      const after = sinon.spy((result) => result);
+      const resolveUpdate = resolver(UpdateUser, {
+        operation: 'update',
+        after
+      });
+
+      const result = await resolveUpdate(
+        null,
+        {
+          where: { id: this.updateUser.id },
+          data: { name: 'read-after-update' }
+        },
+        {},
+        updateInfo
+      );
+
+      expect(result.name).to.equal('read-after-update');
+      expect(after.calledOnceWith(result)).to.equal(true);
+    });
+
+    it('updates through a Date-valued attribute filter', async function () {
+      const resolveUpdate = resolver(UpdateUser, { operation: 'update' });
+
+      const result = await resolveUpdate(
+        null,
+        {
+          where: { scheduledAt: this.updateUser.scheduledAt },
+          data: { status: 'date-filtered' }
+        },
+        {},
+        updateInfo
+      );
+
+      expect(result.status).to.equal('date-filtered');
+      const persisted = await UpdateUser.findByPk(this.updateUser.id);
+      expect(persisted.status).to.equal('date-filtered');
+    });
+
+    it('updates through a Sequelize where expression', async function () {
+      const updateUser = this.updateUser;
+      const resolveUpdate = resolver(UpdateUser, {
+        operation: 'update',
+        before(options) {
+          options.where = Sequelize.where(
+            Sequelize.col('id'),
+            updateUser.id
+          );
+
+          return options;
+        }
+      });
+
+      const result = await resolveUpdate(
+        null,
+        {
+          where: { id: updateUser.id },
+          data: { status: 'expression-filtered' }
+        },
+        {},
+        updateInfo
+      );
+
+      expect(result.status).to.equal('expression-filtered');
+    });
+
+    it('updates through a valid logical object predicate', async function () {
+      const resolveUpdate = resolver(UpdateUser, { operation: 'update' });
+
+      const result = await resolveUpdate(
+        null,
+        {
+          where: {
+            [Op.and]: [
+              { id: this.updateUser.id },
+              { scheduledAt: this.updateUser.scheduledAt }
+            ]
+          },
+          data: { status: 'logical-object-filtered' }
+        },
+        {},
+        updateInfo
+      );
+
+      expect(result.status).to.equal('logical-object-filtered');
+    });
+
+    it('updates through a logical Sequelize expression', async function () {
+      const updateUser = this.updateUser;
+      const resolveUpdate = resolver(UpdateUser, {
+        operation: 'update',
+        before(options) {
+          options.where = {
+            [Op.and]: [
+              Sequelize.where(
+                Sequelize.col('id'),
+                updateUser.id
+              )
+            ]
+          };
+
+          return options;
+        }
+      });
+
+      const result = await resolveUpdate(
+        null,
+        {
+          where: { id: updateUser.id },
+          data: { status: 'logical-expression-filtered' }
+        },
+        {},
+        updateInfo
+      );
+
+      expect(result.status).to.equal('logical-expression-filtered');
+    });
+
+    const ineffectiveWhereFactories = [
+      ['a direct empty Sequelize literal', () => Sequelize.literal('')],
+      [
+        'a nested empty Sequelize literal',
+        () => ({ [Op.and]: [Sequelize.literal('')] })
+      ],
+      [
+        'an unknown symbol-only key',
+        () => ({ [Symbol('unknown-where-key')]: true })
+      ],
+      [
+        'a non-enumerable predicate',
+        (updateUser) => {
+          const where = {};
+          Object.defineProperty(where, 'id', {
+            enumerable: false,
+            value: updateUser.id
+          });
+
+          return where;
+        }
+      ],
+      ['a sparse and array', () => ({ [Op.and]: new Array(1) })],
+      ['a sparse or array', () => ({ [Op.or]: new Array(1) })],
+      ['a sparse not array', () => ({ [Op.not]: new Array(1) })]
+    ];
+
+    ineffectiveWhereFactories.forEach(([description, createWhere]) => {
+      it(`rejects ${description} without changing rows`, async function () {
+        const updateUser = this.updateUser;
+        await UpdateUser.create({
+          name: 'second-user',
+          status: 'second-active',
+          scheduledAt: new Date('2026-07-30T12:34:56.000Z')
+        });
+        const beforeRows = await UpdateUser.findAll({
+          attributes: ['id', 'status'],
+          order: [['id', 'ASC']],
+          raw: true
+        });
+        const resolveUpdate = resolver(UpdateUser, {
+          operation: 'update',
+          before(options) {
+            options.where = createWhere(updateUser);
+
+            return options;
+          }
+        });
+        let updateError;
+
+        try {
+          await resolveUpdate(
+            null,
+            {
+              where: { id: updateUser.id },
+              data: { status: 'must-not-update' }
+            },
+            {},
+            updateInfo
+          );
+        } catch (error) {
+          updateError = error;
+        }
+
+        const afterRows = await UpdateUser.findAll({
+          attributes: ['id', 'status'],
+          order: [['id', 'ASC']],
+          raw: true
+        });
+
+        expect(updateError).to.be.instanceOf(Error);
+        expect(updateError.message).to.equal(
+          'No where filter provided to perform an update.'
+        );
+        expect(afterRows).to.deep.equal(beforeRows);
+      });
+    });
+
+    const invalidLogicalEntries = [
+      ['null', null],
+      ['false', false],
+      ['zero', 0],
+      ['an empty string', ''],
+      ['a Date', new Date('2026-07-31T12:34:56.000Z')],
+      ['an empty object', {}],
+      ['an empty array', []]
+    ];
+    const logicalOperators = [
+      ['and', Op.and],
+      ['or', Op.or],
+      ['not', Op.not]
+    ];
+
+    logicalOperators.forEach(([operatorName, operator]) => {
+      invalidLogicalEntries.forEach(([entryName, invalidEntry]) => {
+        it(`rejects ${operatorName} arrays containing ${entryName}`, async function () {
+          await UpdateUser.create({
+            name: 'second-user',
+            status: 'second-active',
+            scheduledAt: new Date('2026-07-30T12:34:56.000Z')
+          });
+          const beforeRows = await UpdateUser.findAll({
+            attributes: ['id', 'status'],
+            order: [['id', 'ASC']],
+            raw: true
+          });
+          const resolveUpdate = resolver(UpdateUser, {
+            operation: 'update'
+          });
+          let updateError;
+
+          try {
+            await resolveUpdate(
+              null,
+              {
+                where: { [operator]: [invalidEntry] },
+                data: { status: 'must-not-update' }
+              },
+              {},
+              updateInfo
+            );
+          } catch (error) {
+            updateError = error;
+          }
+
+          const afterRows = await UpdateUser.findAll({
+            attributes: ['id', 'status'],
+            order: [['id', 'ASC']],
+            raw: true
+          });
+
+          expect(updateError).to.be.instanceOf(Error);
+          expect(updateError.message).to.equal(
+            'No where filter provided to perform an update.'
+          );
+          expect(afterRows).to.deep.equal(beforeRows);
+        });
+      });
+    });
+
+    it('rejects missing, empty, and non-plain update data', async function () {
+      const resolveUpdate = resolver(UpdateUser, { operation: 'update' });
+      const args = { where: { id: this.updateUser.id } };
+
+      await expect(
+        resolveUpdate(null, args, {}, updateInfo)
+      ).to.be.rejectedWith('No data provided to perform an update.');
+      await expect(
+        resolveUpdate(null, { ...args, data: {} }, {}, updateInfo)
+      ).to.be.rejectedWith('No data provided to perform an update.');
+      await expect(
+        resolveUpdate(null, { ...args, data: [] }, {}, updateInfo)
+      ).to.be.rejectedWith('Update data must be a plain object.');
+      await expect(
+        resolveUpdate(null, { ...args, data: new Date() }, {}, updateInfo)
+      ).to.be.rejectedWith('Update data must be a plain object.');
+    });
+
+    it('rejects unknown update attributes', async function () {
+      const resolveUpdate = resolver(UpdateUser, { operation: 'update' });
+
+      await expect(
+        resolveUpdate(
+          null,
+          {
+            where: { id: this.updateUser.id },
+            data: { missingAttribute: 'value' }
+          },
+          {},
+          updateInfo
+        )
+      ).to.be.rejectedWith('Unknown update attribute: missingAttribute');
+    });
+
+    it('requires a meaningful update where filter', async function () {
+      const resolveUpdate = resolver(UpdateUser, { operation: 'update' });
+      const emptyFilters = [
+        {},
+        { id: {} },
+        { [Op.and]: [] }
+      ];
+
+      for (const where of emptyFilters) {
+        await expect(
+          resolveUpdate(
+            null,
+            { where, data: { name: 'unscoped-update' } },
+            {},
+            updateInfo
+          )
+        ).to.be.rejectedWith('No where filter provided to perform an update.');
+      }
+    });
+
+    it('rejects direct and thunked association update targets', async function () {
+      expect(() =>
+        resolver(User.Tasks, { operation: 'update' })
+      ).to.throw('Update operation requires a model target.');
+
+      const resolveUpdate = resolver(
+        () => User.Tasks,
+        { operation: 'update' }
+      );
+
+      await expect(
+        resolveUpdate(
+          this.userA,
+          { where: { id: 1 }, data: { title: 'unsupported' } },
+          {},
+          { ...updateInfo, returnType: taskType }
+        )
+      ).to.be.rejectedWith('Update operation requires a model target.');
+    });
+
+    it('rejects joined updates', async function () {
+      const resolveUpdate = resolver(User, {
+        operation: 'update',
+        models: { tasks: Task }
+      });
+
+      await expect(
+        resolveUpdate(
+          null,
+          {
+            where: { tasks: { title: 'joined' } },
+            data: { name: 'unsupported' }
+          },
+          {},
+          { ...updateInfo, returnType: userType }
+        )
+      ).to.be.rejectedWith('Joined updates are not supported.');
+    });
+  });
+
+  describe('default scope attributes', function () {
+    let ArrayScopedUser;
+    let ObjectScopedUser;
+    let arrayInfo;
+    let objectInfo;
+
+    before(async function () {
+      ArrayScopedUser = sequelize.define('resolverArrayScopedUser', {
+        name: Sequelize.STRING,
+        secret: Sequelize.STRING
+      }, {
+        defaultScope: {
+          attributes: ['id', 'name']
+        },
+        timestamps: false
+      });
+      ObjectScopedUser = sequelize.define('resolverObjectScopedUser', {
+        name: Sequelize.STRING,
+        status: Sequelize.STRING,
+        secret: Sequelize.STRING
+      }, {
+        defaultScope: {
+          attributes: {
+            exclude: ['secret'],
+            include: [['name', 'displayName']]
+          }
+        },
+        timestamps: false
+      });
+      markFilterable(ArrayScopedUser, 'id');
+      markFilterable(ObjectScopedUser, 'id');
+      await ArrayScopedUser.sync({ force: true });
+      await ObjectScopedUser.sync({ force: true });
+
+      arrayInfo = {
+        returnType: new GraphQLObjectType({
+          name: 'ResolverArrayScopedUser',
+          fields: {
+            id: { type: GraphQLInt },
+            name: { type: GraphQLString }
+          }
+        }),
+        variableValues: {}
+      };
+      objectInfo = {
+        returnType: new GraphQLObjectType({
+          name: 'ResolverObjectScopedUser',
+          fields: {
+            id: { type: GraphQLInt },
+            name: { type: GraphQLString },
+            status: { type: GraphQLString },
+            displayName: { type: GraphQLString }
+          }
+        }),
+        variableValues: {}
+      };
+    });
+
+    before(async function () {
+      await ArrayScopedUser.create({ name: 'array-visible', secret: 'hidden' });
+      await ObjectScopedUser.create({
+        name: 'object-visible',
+        status: 'active',
+        secret: 'hidden'
+      });
+    });
+
+    it('preserves an official array attribute projection', async function () {
+      const findOne = sinon.spy(ArrayScopedUser, 'findOne');
+
+      try {
+        const result = await resolver(ArrayScopedUser)(null, {}, {}, arrayInfo);
+
+        expect(result.name).to.equal('array-visible');
+        expect(result.get('secret')).to.equal(undefined);
+        expect(findOne.firstCall.args[0].attributes).to.deep.equal([
+          'id',
+          'name'
+        ]);
+      } finally {
+        findOne.restore();
+      }
+    });
+
+    it('preserves include, exclude, and aliases in object projections', async function () {
+      const findOne = sinon.spy(ObjectScopedUser, 'findOne');
+
+      try {
+        const result = await resolver(ObjectScopedUser)(
+          null,
+          {},
+          {},
+          objectInfo
+        );
+
+        expect(result.name).to.equal('object-visible');
+        expect(result.status).to.equal('active');
+        expect(result.get('secret')).to.equal(undefined);
+        expect(result.get('displayName')).to.equal('object-visible');
+        expect(findOne.firstCall.args[0].attributes).to.deep.equal({
+          exclude: ['secret'],
+          include: [['name', 'displayName']]
+        });
+      } finally {
+        findOne.restore();
+      }
+    });
+  });
+
+  describe('resolver-local count context', function () {
+    let CountAlpha;
+    let CountBeta;
+    let alphaInfo;
+    let betaInfo;
+
+    before(async function () {
+      CountAlpha = sequelize.define('resolverCountAlpha', {
+        category: Sequelize.STRING
+      }, {
+        timestamps: false
+      });
+      CountBeta = sequelize.define('resolverCountBeta', {
+        category: Sequelize.STRING
+      }, {
+        timestamps: false
+      });
+      await CountAlpha.sync({ force: true });
+      await CountBeta.sync({ force: true });
+      await CountAlpha.bulkCreate([
+        { category: 'included' },
+        { category: 'included' },
+        { category: 'excluded' }
+      ]);
+      await CountBeta.bulkCreate([
+        { category: 'included' },
+        { category: 'included' },
+        { category: 'included' },
+        { category: 'excluded' }
+      ]);
+
+      alphaInfo = {
+        returnType: new GraphQLList(new GraphQLObjectType({
+          name: 'ResolverCountAlpha',
+          fields: {
+            category: { type: GraphQLString }
+          }
+        })),
+        variableValues: {}
+      };
+      betaInfo = {
+        returnType: new GraphQLList(new GraphQLObjectType({
+          name: 'ResolverCountBeta',
+          fields: {
+            category: { type: GraphQLString }
+          }
+        })),
+        variableValues: {}
+      };
+    });
+
+    it('isolates count closures across concurrent sibling after hooks', async function () {
+      const sharedContext = {};
+      let arrived = 0;
+      let release;
+      const bothAfterHooksArrived = new globalThis.Promise((resolve) => {
+        release = resolve;
+      });
+      const after = async (_result, _args, context) => {
+        arrived += 1;
+        if (arrived === 2) {
+          release();
+        }
+        await bothAfterHooksArrived;
+
+        return {
+          count: await context.count(),
+          model: context.model,
+          where: context.where
+        };
+      };
+      const resolveAlpha = resolver(CountAlpha, { list: true, after });
+      const resolveBeta = resolver(CountBeta, { list: true, after });
+
+      const [alphaContext, betaContext] = await Promise.all([
+        resolveAlpha(
+          null,
+          { where: { category: 'included' } },
+          sharedContext,
+          alphaInfo
+        ),
+        resolveBeta(
+          null,
+          { where: { category: 'included' } },
+          sharedContext,
+          betaInfo
+        )
+      ]);
+
+      expect(alphaContext).to.deep.equal({
+        count: 2,
+        model: CountAlpha,
+        where: { category: 'included' }
+      });
+      expect(betaContext).to.deep.equal({
+        count: 3,
+        model: CountBeta,
+        where: { category: 'included' }
+      });
+      expect(sharedContext.model).to.equal(CountBeta);
+      expect(sharedContext.where).to.deep.equal({ category: 'included' });
+      expect(await sharedContext.count()).to.equal(3);
+    });
+
+    it('passes the original private-field context to after hooks', async function () {
+      class PrivateFieldContext {
+        #value = 'private-context';
+
+        /**
+         * Read the private value through a private method.
+         *
+         * @return {String} private context value
+         */
+        readValue() {
+          return this.#readValue();
+        }
+
+        /**
+         * Read the private field using the class brand.
+         *
+         * @return {String} private context value
+         */
+        #readValue() {
+          return this.#value;
+        }
+      }
+
+      const context = new PrivateFieldContext();
+      let afterContext;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after(_result, _args, localContext) {
+          afterContext = localContext;
+
+          return localContext.readValue();
+        }
+      });
+
+      const result = await resolveAlpha(null, {}, context, alphaInfo);
+
+      expect(afterContext).to.equal(context);
+      expect(result).to.equal('private-context');
+    });
+
+    it('passes the original Map context to after hooks', async function () {
+      const context = new Map([['existing', 'map-context']]);
+      let afterContext;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after(_result, _args, localContext) {
+          afterContext = localContext;
+          localContext.set('added', 'map-added');
+
+          return localContext.get('existing');
+        }
+      });
+
+      const result = await resolveAlpha(null, {}, context, alphaInfo);
+
+      expect(afterContext).to.equal(context);
+      expect(result).to.equal('map-context');
+      expect(context.get('added')).to.equal('map-added');
+    });
+
+    it('passes the original Set context to after hooks', async function () {
+      const context = new Set(['set-context']);
+      let afterContext;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after(_result, _args, localContext) {
+          afterContext = localContext;
+          localContext.add('set-added');
+
+          return localContext.has('set-context');
+        }
+      });
+
+      const result = await resolveAlpha(null, {}, context, alphaInfo);
+
+      expect(afterContext).to.equal(context);
+      expect(result).to.equal(true);
+      expect(context.has('set-added')).to.equal(true);
+    });
+
+    it('passes the original Date context to after hooks', async function () {
+      const context = new Date('2020-01-02T03:04:05.000Z');
+      let afterContext;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after(_result, _args, localContext) {
+          afterContext = localContext;
+
+          return localContext.getTime();
+        }
+      });
+
+      const result = await resolveAlpha(null, {}, context, alphaInfo);
+
+      expect(afterContext).to.equal(context);
+      expect(result).to.equal(context.getTime());
+    });
+
+    it('keeps compatible query options in resolver-local counts', async function () {
+      const transaction = await sequelize.transaction();
+      const logging = sinon.spy();
+      const count = sinon.spy(CountAlpha, 'count');
+      const context = {};
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        before(options) {
+          options.transaction = transaction;
+          options.logging = logging;
+          options.paranoid = false;
+          options.limit = 1;
+          options.offset = 0;
+          options.order = [['id', 'ASC']];
+          options.include = [];
+          options.customCountOption = 'preserved';
+
+          return options;
+        },
+        after: async (_result, _args, localContext) => {
+          return localContext.count();
+        }
+      });
+
+      try {
+        const result = await resolveAlpha(
+          null,
+          { where: { category: 'included' } },
+          context,
+          alphaInfo
+        );
+        const countOptions = count.firstCall.args[0];
+
+        expect(result).to.equal(2);
+        expect(context.model).to.equal(CountAlpha);
+        expect(context.where).to.deep.equal({ category: 'included' });
+        expect(countOptions.transaction).to.equal(transaction);
+        expect(countOptions.logging).to.equal(logging);
+        expect(countOptions.paranoid).to.equal(false);
+        expect(countOptions.include).to.deep.equal([]);
+        expect(countOptions.where).to.deep.equal({ category: 'included' });
+        expect(countOptions.customCountOption).to.equal('preserved');
+        expect(countOptions.distinct).to.equal(true);
+        expect(countOptions).to.not.have.property('attributes');
+        expect(countOptions).to.not.have.property('limit');
+        expect(countOptions).to.not.have.property('offset');
+        expect(countOptions).to.not.have.property('order');
+      } finally {
+        count.restore();
+        await transaction.rollback();
+      }
+    });
+
+    it('forwards after-hook context writes to the shared context', async function () {
+      const replacementCount = sinon.stub().resolves(41);
+      const extensionValue = { source: 'after-hook' };
+      const sharedContext = { existingField: 'existing' };
+      let hookKeys;
+      let hookHasExtension;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after(result, _args, localContext) {
+          expect(localContext.model).to.equal(CountAlpha);
+          expect(localContext.where).to.deep.equal({ category: 'included' });
+
+          localContext.model = 'overridden-model';
+          localContext.count = replacementCount;
+          localContext.extensionField = extensionValue;
+
+          expect(localContext.model).to.equal('overridden-model');
+          expect(localContext.count).to.equal(replacementCount);
+          expect(localContext.extensionField).to.equal(extensionValue);
+          hookKeys = Object.keys(localContext);
+          hookHasExtension = 'extensionField' in localContext;
+
+          return result;
+        }
+      });
+
+      await resolveAlpha(
+        null,
+        { where: { category: 'included' } },
+        sharedContext,
+        alphaInfo
+      );
+
+      expect(sharedContext.model).to.equal('overridden-model');
+      expect(sharedContext.count).to.equal(replacementCount);
+      expect(sharedContext.extensionField).to.equal(extensionValue);
+      expect(hookHasExtension).to.equal(true);
+      expect(hookKeys).to.have.members([
+        'existingField',
+        'model',
+        'where',
+        'count',
+        'extensionField'
+      ]);
+      expect(await sharedContext.count()).to.equal(41);
+    });
+
+    it('reinstalls metadata accessors after native replacement and deletion', async function () {
+      const replacementCount = sinon.stub().resolves(41);
+      const sharedContext = {};
+      let hookCalls = 0;
+      let secondSnapshot;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        async after(result, _args, localContext) {
+          hookCalls += 1;
+          expect(localContext).to.equal(sharedContext);
+
+          if (hookCalls === 1) {
+            Object.defineProperty(localContext, 'count', {
+              configurable: true,
+              enumerable: false,
+              value: replacementCount,
+              writable: true
+            });
+            expect(delete localContext.where).to.equal(true);
+
+            return result;
+          }
+
+          secondSnapshot = {
+            count: await localContext.count(),
+            countDescriptor: Object.getOwnPropertyDescriptor(
+              localContext,
+              'count'
+            ),
+            where: localContext.where,
+            whereDescriptor: Object.getOwnPropertyDescriptor(
+              localContext,
+              'where'
+            )
+          };
+
+          return result;
+        }
+      });
+
+      await resolveAlpha(
+        null,
+        { where: { category: 'excluded' } },
+        sharedContext,
+        alphaInfo
+      );
+
+      expect(sharedContext.count).to.equal(replacementCount);
+      expect(sharedContext).to.not.have.property('where');
+
+      await resolveAlpha(
+        null,
+        { where: { category: 'included' } },
+        sharedContext,
+        alphaInfo
+      );
+
+      expect(secondSnapshot.count).to.equal(2);
+      expect(secondSnapshot.where).to.deep.equal({ category: 'included' });
+      expect(secondSnapshot.countDescriptor).to.include({
+        configurable: true,
+        enumerable: true
+      });
+      expect(secondSnapshot.countDescriptor.get).to.be.a('function');
+      expect(secondSnapshot.countDescriptor.set).to.be.a('function');
+      expect(secondSnapshot.whereDescriptor).to.include({
+        configurable: true,
+        enumerable: true
+      });
+      expect(secondSnapshot.whereDescriptor.get).to.be.a('function');
+      expect(secondSnapshot.whereDescriptor.set).to.be.a('function');
+      expect(await sharedContext.count()).to.equal(2);
+      expect(sharedContext.where).to.deep.equal({ category: 'included' });
+    });
+
+    it('keeps native fallback behavior for non-configurable metadata', async function () {
+      const fixedCount = sinon.stub().resolves(91);
+      const sharedContext = {};
+      Object.defineProperty(sharedContext, 'count', {
+        configurable: false,
+        enumerable: true,
+        value: fixedCount,
+        writable: false
+      });
+      let afterContext;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after(_result, _args, localContext) {
+          afterContext = localContext;
+
+          return localContext.count();
+        }
+      });
+
+      const result = await resolveAlpha(
+        null,
+        { where: { category: 'included' } },
+        sharedContext,
+        alphaInfo
+      );
+
+      expect(afterContext).to.equal(sharedContext);
+      expect(result).to.equal(91);
+      expect(sharedContext.count).to.equal(fixedCount);
+      expect(Object.getOwnPropertyDescriptor(sharedContext, 'count')).to
+        .deep.equal({
+          configurable: false,
+          enumerable: true,
+          value: fixedCount,
+          writable: false
+        });
+    });
+
+    it('coordinates complete after-hook context mutation semantics', async function () {
+      const definedCount = sinon.stub().resolves(73);
+      const sharedContext = { existingField: 'existing' };
+      let mutationSnapshot;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after(result, _args, localContext) {
+          localContext.model = 'set-model';
+          Object.defineProperty(localContext, 'count', {
+            configurable: true,
+            enumerable: false,
+            value: definedCount,
+            writable: true
+          });
+          Object.defineProperty(localContext, 'permanentExtension', {
+            configurable: false,
+            enumerable: true,
+            value: 'permanent',
+            writable: false
+          });
+          localContext.temporaryExtension = 'temporary';
+
+          expect(delete localContext.where).to.equal(true);
+          expect(delete localContext.temporaryExtension).to.equal(true);
+          expect(() => {
+            Object.defineProperty(localContext, 'permanentExtension', {
+              value: 'changed'
+            });
+          }).to.throw(TypeError);
+          expect(() => {
+            delete localContext.permanentExtension;
+          }).to.throw(TypeError);
+
+          mutationSnapshot = {
+            count: localContext.count,
+            countDescriptor: Object.getOwnPropertyDescriptor(
+              localContext,
+              'count'
+            ),
+            hasPermanentExtension: 'permanentExtension' in localContext,
+            hasTemporaryExtension: 'temporaryExtension' in localContext,
+            hasWhere: 'where' in localContext,
+            keys: Reflect.ownKeys(localContext),
+            model: localContext.model,
+            permanentDescriptor: Object.getOwnPropertyDescriptor(
+              localContext,
+              'permanentExtension'
+            ),
+            permanentExtension: localContext.permanentExtension,
+            temporaryExtension: localContext.temporaryExtension,
+            where: localContext.where
+          };
+
+          return result;
+        }
+      });
+
+      await resolveAlpha(
+        null,
+        { where: { category: 'included' } },
+        sharedContext,
+        alphaInfo
+      );
+
+      expect(mutationSnapshot.model).to.equal('set-model');
+      expect(mutationSnapshot.count).to.equal(definedCount);
+      expect(mutationSnapshot.where).to.equal(undefined);
+      expect(mutationSnapshot.temporaryExtension).to.equal(undefined);
+      expect(mutationSnapshot.permanentExtension).to.equal('permanent');
+      expect(mutationSnapshot.hasWhere).to.equal(false);
+      expect(mutationSnapshot.hasTemporaryExtension).to.equal(false);
+      expect(mutationSnapshot.hasPermanentExtension).to.equal(true);
+      expect(mutationSnapshot.keys).to.have.members(
+        Reflect.ownKeys(sharedContext)
+      );
+      expect(mutationSnapshot.countDescriptor).to.deep.equal(
+        Object.getOwnPropertyDescriptor(sharedContext, 'count')
+      );
+      expect(mutationSnapshot.permanentDescriptor).to.deep.equal(
+        Object.getOwnPropertyDescriptor(
+          sharedContext,
+          'permanentExtension'
+        )
+      );
+      expect(sharedContext.model).to.equal('set-model');
+      expect(sharedContext.count).to.equal(definedCount);
+      expect(sharedContext).to.not.have.property('where');
+      expect(sharedContext).to.not.have.property('temporaryExtension');
+      expect(sharedContext.permanentExtension).to.equal('permanent');
+      expect(await sharedContext.count()).to.equal(73);
+    });
+
+    it('preserves live getter and setter semantics on hook-defined accessors', async function () {
+      const sharedContext = {};
+      let getterCalls = 0;
+      let setterCalls = 0;
+      let storedValue = 'initial';
+      const getterReceivers = [];
+      const setterReceivers = [];
+      let accessorSnapshot;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after(result, _args, localContext) {
+          Object.defineProperty(localContext, 'dynamicExtension', {
+            configurable: true,
+            enumerable: true,
+            get() {
+              getterReceivers.push(this);
+              getterCalls += 1;
+
+              return `${storedValue}:${getterCalls}`;
+            },
+            set(value) {
+              setterReceivers.push(this);
+              setterCalls += 1;
+              storedValue = value;
+            }
+          });
+          const getterCallsAfterDefinition = getterCalls;
+          const firstRead = localContext.dynamicExtension;
+          const secondRead = localContext.dynamicExtension;
+          const getterCallsAfterReads = getterCalls;
+
+          localContext.dynamicExtension = 'updated';
+          const getterCallsAfterSet = getterCalls;
+          const readAfterSet = localContext.dynamicExtension;
+
+          accessorSnapshot = {
+            firstRead,
+            getterCallsAfterDefinition,
+            getterCallsAfterReads,
+            getterCallsAfterSet,
+            gettersUseOriginalReceiver: getterReceivers.every(
+              (receiver) => receiver === localContext
+            ),
+            localDescriptor: Object.getOwnPropertyDescriptor(
+              localContext,
+              'dynamicExtension'
+            ),
+            readAfterSet,
+            secondRead,
+            setterUsesOriginalReceiver: setterReceivers.every(
+              (receiver) => receiver === localContext
+            ),
+            setterCalls,
+            storedValue
+          };
+
+          return result;
+        }
+      });
+
+      await resolveAlpha(null, {}, sharedContext, alphaInfo);
+
+      expect(accessorSnapshot.getterCallsAfterDefinition).to.equal(0);
+      expect(accessorSnapshot.firstRead).to.equal('initial:1');
+      expect(accessorSnapshot.secondRead).to.equal('initial:2');
+      expect(accessorSnapshot.getterCallsAfterReads).to.equal(2);
+      expect(accessorSnapshot.getterCallsAfterSet).to.equal(2);
+      expect(accessorSnapshot.gettersUseOriginalReceiver).to.equal(true);
+      expect(accessorSnapshot.readAfterSet).to.equal('updated:3');
+      expect(accessorSnapshot.setterUsesOriginalReceiver).to.equal(true);
+      expect(accessorSnapshot.setterCalls).to.equal(1);
+      expect(accessorSnapshot.storedValue).to.equal('updated');
+      expect(accessorSnapshot.localDescriptor).to.deep.equal(
+        Object.getOwnPropertyDescriptor(sharedContext, 'dynamicExtension')
+      );
+      expect(sharedContext.dynamicExtension).to.equal('updated:4');
+    });
+
+    it('invokes a throwing hook-defined getter only on explicit reads', async function () {
+      const sharedContext = {};
+      let getterCalls = 0;
+      let accessorSnapshot;
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after(result, _args, localContext) {
+          Object.defineProperty(localContext, 'throwingExtension', {
+            configurable: true,
+            enumerable: true,
+            get() {
+              getterCalls += 1;
+              throw new Error('accessor read failed');
+            }
+          });
+          const getterCallsAfterDefinition = getterCalls;
+          const localDescriptor = Object.getOwnPropertyDescriptor(
+            localContext,
+            'throwingExtension'
+          );
+          let readError;
+
+          try {
+            Reflect.get(localContext, 'throwingExtension');
+          } catch (error) {
+            readError = error;
+          }
+
+          accessorSnapshot = {
+            getterCallsAfterDefinition,
+            getterCallsAfterRead: getterCalls,
+            localDescriptor,
+            readError
+          };
+
+          return result;
+        }
+      });
+
+      await resolveAlpha(null, {}, sharedContext, alphaInfo);
+
+      expect(accessorSnapshot.getterCallsAfterDefinition).to.equal(0);
+      expect(accessorSnapshot.getterCallsAfterRead).to.equal(1);
+      expect(accessorSnapshot.readError).to.be.instanceOf(Error);
+      expect(accessorSnapshot.readError.message).to.equal(
+        'accessor read failed'
+      );
+      expect(accessorSnapshot.localDescriptor).to.deep.equal(
+        Object.getOwnPropertyDescriptor(sharedContext, 'throwingExtension')
+      );
+      expect(
+        Object.prototype.hasOwnProperty.call(
+          sharedContext,
+          'throwingExtension'
+        )
+      ).to.equal(true);
+    });
+
+    it('keeps deletion tombstones consistent across sibling recreation', async function () {
+      const sharedContext = {
+        invariantField: 'initial-invariant',
+        recreatedField: 'initial-recreated'
+      };
+      let releaseDeleted;
+      let releaseRecreated;
+      const deleted = new globalThis.Promise((resolve) => {
+        releaseDeleted = resolve;
+      });
+      const recreated = new globalThis.Promise((resolve) => {
+        releaseRecreated = resolve;
+      });
+      let invariantSnapshot;
+      let recreatedSnapshot;
+      let rewrittenSnapshot;
+      let sharedMissingAfterDeletion;
+      const resolveDeletingSibling = resolver(CountAlpha, {
+        list: true,
+        async after(result, _args, localContext) {
+          expect(delete localContext.recreatedField).to.equal(true);
+          expect(delete localContext.invariantField).to.equal(true);
+          sharedMissingAfterDeletion =
+            !Object.prototype.hasOwnProperty.call(
+              sharedContext,
+              'recreatedField'
+            ) &&
+            !Object.prototype.hasOwnProperty.call(
+              sharedContext,
+              'invariantField'
+            );
+          releaseDeleted();
+          await recreated;
+
+          recreatedSnapshot = {
+            descriptor: Object.getOwnPropertyDescriptor(
+              localContext,
+              'recreatedField'
+            ),
+            has: 'recreatedField' in localContext,
+            key: Reflect.ownKeys(localContext).includes('recreatedField'),
+            value: localContext.recreatedField
+          };
+          invariantSnapshot = {
+            descriptor: Object.getOwnPropertyDescriptor(
+              localContext,
+              'invariantField'
+            ),
+            has: 'invariantField' in localContext,
+            key: Reflect.ownKeys(localContext).includes('invariantField'),
+            value: localContext.invariantField
+          };
+
+          localContext.recreatedField = 'local-recreated';
+          rewrittenSnapshot = {
+            descriptor: Object.getOwnPropertyDescriptor(
+              localContext,
+              'recreatedField'
+            ),
+            has: 'recreatedField' in localContext,
+            key: Reflect.ownKeys(localContext).includes('recreatedField'),
+            value: localContext.recreatedField
+          };
+
+          return result;
+        }
+      });
+      const resolveRecreatingSibling = resolver(CountBeta, {
+        list: true,
+        async after(result, _args, localContext) {
+          await deleted;
+          localContext.recreatedField = 'sibling-recreated';
+          Object.defineProperty(localContext, 'invariantField', {
+            configurable: false,
+            enumerable: true,
+            value: 'sibling-invariant',
+            writable: false
+          });
+          releaseRecreated();
+
+          return result;
+        }
+      });
+
+      await Promise.all([
+        resolveDeletingSibling(null, {}, sharedContext, alphaInfo),
+        resolveRecreatingSibling(null, {}, sharedContext, betaInfo)
+      ]);
+
+      expect(sharedMissingAfterDeletion).to.equal(true);
+      expect(recreatedSnapshot).to.deep.equal({
+        descriptor: {
+          configurable: true,
+          enumerable: true,
+          value: 'sibling-recreated',
+          writable: true
+        },
+        has: true,
+        key: true,
+        value: 'sibling-recreated'
+      });
+      expect(invariantSnapshot).to.deep.equal({
+        descriptor: Object.getOwnPropertyDescriptor(
+          sharedContext,
+          'invariantField'
+        ),
+        has: true,
+        key: true,
+        value: 'sibling-invariant'
+      });
+      expect(rewrittenSnapshot).to.deep.equal({
+        descriptor: Object.getOwnPropertyDescriptor(
+          sharedContext,
+          'recreatedField'
+        ),
+        has: true,
+        key: true,
+        value: 'local-recreated'
+      });
+      expect(sharedContext.recreatedField).to.equal('local-recreated');
+    });
+  });
+
+  describe('prototype-named filterable attributes', function () {
+    let PrototypeNamedModel;
+    let prototypeNamedInfo;
+
+    before(async function () {
+      const attributes = Object.create(null);
+      Object.assign(attributes, Object.fromEntries([
+        ['__proto__', { type: Sequelize.STRING, field: 'proto_value' }],
+        ['constructor', { type: Sequelize.STRING, field: 'constructor_value' }],
+        ['toString', { type: Sequelize.STRING, field: 'to_string_value' }]
+      ]));
+      PrototypeNamedModel = sequelize.define(
+        'resolverPrototypeNamed',
+        attributes,
+        { timestamps: false }
+      );
+      await PrototypeNamedModel.sync({ force: true });
+
+      prototypeNamedInfo = {
+        returnType: new GraphQLList(new GraphQLObjectType({
+          name: 'ResolverPrototypeNamed',
+          fields: {
+            id: { type: GraphQLInt }
+          }
+        })),
+        variableValues: {}
+      };
+    });
+
+    it('maps inherited object names to their physical fields', async function () {
+      const findAll = sinon.stub(PrototypeNamedModel, 'findAll').resolves([]);
+      const resolvePrototypeNamed = resolver(PrototypeNamedModel, {
+        list: true,
+        models: {
+          [PrototypeNamedModel.name]: PrototypeNamedModel
+        }
+      });
+
+      try {
+        const result = await resolvePrototypeNamed(
+          null,
+          {
+            orderBy: [
+              ['__proto__', 'ASC'],
+              ['constructor', 'ASC'],
+              ['toString', 'ASC']
+            ]
+          },
+          {},
+          prototypeNamedInfo
+        );
+
+        expect(result).to.deep.equal([]);
+        expect(findAll.firstCall.args[0].order).to.deep.equal([
+          ['proto_value', 'ASC'],
+          ['constructor_value', 'ASC'],
+          ['to_string_value', 'ASC']
+        ]);
+      } finally {
+        findAll.restore();
+      }
+    });
+  });
+
+  describe('resolved resolver targets', function () {
+    const invalidResolvedTargetMessage =
+      'Resolver target must resolve to a model or an association.';
+    const invalidFactoryTargetMessage =
+      'resolverFactory should be called with a model, an association or a function (which resolves to a model or an association)';
+    const primaryKeyRequiredMessage =
+      'List and Relay resolvers require a model primary key.';
+    let KeylessModel;
+    let keylessConnection;
+    let keylessInfo;
+    let keylessListInfo;
+
+    before(async function () {
+      KeylessModel = sequelize.define('resolverKeylessTarget', {
+        code: Sequelize.STRING,
+        status: Sequelize.STRING
+      }, {
+        timestamps: false
+      });
+      KeylessModel.removeAttribute('id');
+      markFilterable(KeylessModel, 'code');
+      await KeylessModel.sync({ force: true });
+      await KeylessModel.create({
+        code: 'only-keyless-row',
+        status: 'initial'
+      });
+
+      const keylessType = new GraphQLObjectType({
+        name: 'ResolverKeylessTarget',
+        fields: {
+          code: { type: GraphQLString },
+          status: { type: GraphQLString }
+        }
+      });
+      keylessInfo = {
+        returnType: keylessType,
+        variableValues: {}
+      };
+      keylessListInfo = {
+        returnType: new GraphQLList(keylessType),
+        variableValues: {}
+      };
+      keylessConnection = createConnection({
+        name: 'ResolverKeylessTarget',
+        nodeType: keylessType,
+        target: KeylessModel
+      });
+    });
+
+    /**
+     * Build a method-complete model lookalike for target-guard tests.
+     *
+     * @param {object} overrides runtime fields to replace
+     * @return {object} structural model lookalike
+     */
+    function createFauxModel(overrides = {}) {
+      const rawAttributes = {
+        id: {
+          field: 'id',
+          fieldName: 'id',
+          filterable: true,
+          type: { key: 'INTEGER' }
+        }
+      };
+
+      return {
+        count: sinon.stub().resolves(0),
+        findAll: sinon.stub().resolves([]),
+        findOne: sinon.stub().resolves(null),
+        getAttributes: sinon.stub().returns(rawAttributes),
+        getTableName: sinon.stub().returns('faux_models'),
+        name: 'FauxModel',
+        options: { defaultScope: {} },
+        primaryKeyAttribute: 'id',
+        prototype: {},
+        rawAttributes,
+        sequelize: { col: sinon.stub() },
+        update: sinon.stub().resolves([0]),
+        ...overrides
+      };
+    }
+
+    /**
+     * Build all malformed model surfaces that previously passed the guard.
+     *
+     * @return {object[]} invalid model lookalikes
+     */
+    function createInvalidFauxModels() {
+      return [
+        createFauxModel({ name: undefined }),
+        createFauxModel({ name: '' }),
+        createFauxModel({ options: undefined }),
+        createFauxModel({ options: [] }),
+        createFauxModel({ rawAttributes: undefined }),
+        createFauxModel({ rawAttributes: [] }),
+        createFauxModel({ sequelize: undefined }),
+        createFauxModel({ sequelize: { col: 'not-callable' } })
+      ];
+    }
+
+    /**
+     * Build association lookalikes without a callable source getter.
+     *
+     * @return {object[]} invalid association lookalikes
+     */
+    function createInvalidFauxAssociations() {
+      const target = createFauxModel({ name: 'FauxTarget' });
+      const validSource = createFauxModel({ name: 'FauxSource' });
+      validSource.prototype.getChildren = sinon.stub().resolves([]);
+      const missingGetterSource = createFauxModel({ name: 'MissingGetter' });
+      const invalidGetterSource = createFauxModel({ name: 'InvalidGetter' });
+      invalidGetterSource.prototype.getChildren = 'not-callable';
+      const associationShape = {
+        accessors: { get: 'getChildren' },
+        as: 'children',
+        associationType: 'HasMany',
+        target
+      };
+
+      return [
+        { ...associationShape },
+        { ...associationShape, source: missingGetterSource },
+        { ...associationShape, source: invalidGetterSource },
+        { ...associationShape, source: validSource, accessors: { get: '' } }
+      ];
+    }
+
+    it('reads a real keyless model directly and through a thunk', async function () {
+      const directResult = await resolver(KeylessModel)(
+        null,
+        {},
+        {},
+        keylessInfo
+      );
+      const thunkResult = await resolver(() => KeylessModel)(
+        null,
+        {},
+        {},
+        keylessInfo
+      );
+
+      expect(directResult.code).to.equal('only-keyless-row');
+      expect(thunkResult.code).to.equal('only-keyless-row');
+    });
+
+    it('updates a keyless model through an explicit where filter', async function () {
+      const result = await resolver(KeylessModel, { operation: 'update' })(
+        null,
+        {
+          data: { status: 'updated' },
+          where: { code: 'only-keyless-row' }
+        },
+        {},
+        keylessInfo
+      );
+
+      expect(result.code).to.equal('only-keyless-row');
+      expect(result.status).to.equal('updated');
+    });
+
+    it('reads an explicitly ordered keyless model list', async function () {
+      const result = await resolver(KeylessModel, {
+        list: true,
+        before(options) {
+          options.order = [['code', 'ASC']];
+
+          return options;
+        }
+      })(null, {}, {}, keylessListInfo);
+
+      expect(result).to.have.length(1);
+      expect(result[0].code).to.equal('only-keyless-row');
+    });
+
+    it('rejects a keyless default-order list with a controlled error', async function () {
+      await expect(
+        resolver(KeylessModel, { list: true })(
+          null,
+          {},
+          {},
+          keylessListInfo
+        )
+      ).to.be.rejectedWith(primaryKeyRequiredMessage);
+    });
+
+    it('rejects a keyless Relay connection with a controlled error', async function () {
+      const keylessSchema = new GraphQLSchema({
+        query: new GraphQLObjectType({
+          name: 'ResolverKeylessQuery',
+          fields: {
+            keylessTargets: {
+              args: keylessConnection.connectionArgs,
+              resolve: keylessConnection.resolve,
+              type: keylessConnection.connectionType
+            }
+          }
+        })
+      });
+
+      const result = await graphql({
+        schema: keylessSchema,
+        source: `
+          query {
+            keylessTargets(first: 1) {
+              edges {
+                node {
+                  code
+                }
+              }
+            }
+          }
+        `
+      });
+
+      expect(result.errors).to.have.length(1);
+      expect(result.errors[0].message).to.equal(primaryKeyRequiredMessage);
+    });
+
+    it('uses a thunk model name for nested model filters', async function () {
+      const findAll = sinon.stub(User, 'findAll').resolves([]);
+      const resolveUsers = resolver(() => User, {
+        list: true,
+        models: {
+          [User.name]: User
+        }
+      });
+      const info = {
+        returnType: new GraphQLList(userType),
+        variableValues: {}
+      };
+
+      try {
+        const result = await resolveUsers(
+          null,
+          {
+            where: {
+              [User.name]: { name: 'resolved-name' }
+            }
+          },
+          {},
+          info
+        );
+
+        expect(result).to.deep.equal([]);
+        expect(findAll.firstCall.args[0].where).to.deep.equal({
+          [`$${User.name}.name$`]: 'resolved-name'
+        });
+      } finally {
+        findAll.restore();
+      }
+    });
+
+    it('supports operator filters through a model thunk', async function () {
+      const expectedUser = await User.findByPk(1);
+      const resolveUsers = resolver(() => User, { list: true });
+      const info = {
+        returnType: new GraphQLList(userType),
+        variableValues: {}
+      };
+      const result = await resolveUsers(
+        null,
+        { where: { name: { eq: expectedUser.name } } },
+        {},
+        info
+      );
+
+      expect(result).to.have.length(1);
+      expect(result[0].id).to.equal(expectedUser.id);
+    });
+
+    it('rejects invalid values returned by target thunks', async function () {
+      const info = {
+        returnType: new GraphQLList(userType),
+        variableValues: {}
+      };
+      const invalidTargets = [
+        null,
+        { name: 'not-a-model' },
+        { getTableName: 'not-callable' },
+        { associationType: 'HasMany' },
+        ...createInvalidFauxModels(),
+        ...createInvalidFauxAssociations()
+      ];
+
+      for (const invalidTarget of invalidTargets) {
+        await expect(
+          resolver(() => invalidTarget)(null, {}, {}, info)
+        ).to.be.rejectedWith(invalidResolvedTargetMessage);
+      }
+    });
+
+    it('rejects invalid direct targets at factory creation', function () {
+      const invalidTargets = [
+        { name: 'not-a-model' },
+        { getTableName: 'not-callable' },
+        { associationType: 'HasMany' },
+        ...createInvalidFauxModels(),
+        ...createInvalidFauxAssociations()
+      ];
+
+      invalidTargets.forEach((invalidTarget) => {
+        expect(() => resolver(invalidTarget)).to.throw(
+          invalidFactoryTargetMessage
+        );
+      });
     });
   });
 });

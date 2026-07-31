@@ -38,6 +38,28 @@ describe('authorization: filterable attributes', function () {
       ).to.not.throw();
     });
 
+    it('treats prototype-named attributes as own field names', function () {
+      const expression = Object.fromEntries([
+        ['__proto__', 'proto'],
+        ['constructor', 'constructor'],
+        ['toString', 'to-string']
+      ]);
+      const result = replaceWhereOperators(expression, {
+        filterableAttributes: ['__proto__', 'constructor', 'toString']
+      });
+
+      expect(Object.keys(result)).to.have.members([
+        '__proto__',
+        'constructor',
+        'toString'
+      ]);
+      expect(
+        Object.getOwnPropertyDescriptor(result, '__proto__').value
+      ).to.equal('proto');
+      expect(result.constructor).to.equal('constructor');
+      expect(result.toString).to.equal('to-string');
+    });
+
     it('fails closed when the filterable set is empty', function () {
       // An empty list must reject everything rather than wave everything
       // through. This is the shape a caller gets when it forgets to pass its

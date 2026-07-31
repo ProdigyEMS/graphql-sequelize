@@ -15,6 +15,7 @@ const generatedModules = [
   'argsToFindOptions',
   'attributeFields',
   'base64',
+  'contracts',
   'defaultArgs',
   'defaultListArgs',
   'index',

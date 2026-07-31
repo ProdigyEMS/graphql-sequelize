@@ -281,7 +281,12 @@ export function createConnectionResolver({
     };
   };
 
-  let $resolver = require('./resolver')(targetMaybeThunk, {
+  // Keep this require lazy to avoid initializing the resolver/Relay cycle.
+  // TypeScript's transitional CommonJS output wraps the default export.
+  // Task 8 replaces this bridge with the final typed ESM import.
+  const resolverModule = require('./resolver');
+  const resolver = resolverModule.default || resolverModule;
+  let $resolver = resolver(targetMaybeThunk, {
     handleConnection: false,
     list: true,
     before: function (options, args, context, info) {

@@ -7,10 +7,11 @@ import type {
   GraphQLType
 } from 'graphql';
 import { GraphQLObjectType, GraphQLString } from 'graphql';
-import type { FindOptions, Model, ModelStatic } from 'sequelize';
+import type { Association, FindOptions, Model, ModelStatic } from 'sequelize';
 import { DataTypes } from 'sequelize';
 import type {
   ConnectionResult,
+  ResolverOptions,
   SimplifiedAST as RootSimplifiedAST,
   SimplifiedASTCollection as RootSimplifiedASTCollection
 } from '../..';
@@ -18,6 +19,12 @@ import generatedAttributeFields from '../../lib/attributeFields.js';
 import type { AttributeFieldsOptions as GeneratedAttributeFieldsOptions } from '../../lib/attributeFields.js';
 import generatedDefaultArgs from '../../lib/defaultArgs.js';
 import generatedDefaultListArgs from '../../lib/defaultListArgs.js';
+import generatedResolver from '../../lib/resolver.js';
+import type {
+  ResolverFactory as GeneratedResolverFactory,
+  ResolverOptions as GeneratedResolverOptions,
+  ResolverTarget as GeneratedResolverTarget
+} from '../../lib/contracts.js';
 import generatedSimplifyAST from '../../lib/simplifyAST.js';
 import type {
   SimplifiedAST as GeneratedSimplifiedAST,
@@ -52,6 +59,7 @@ interface ConnectionArgs {
 }
 
 declare const User: ModelStatic<Model>;
+declare const UserTasks: Association<Model, Model>;
 declare const info: GraphQLResolveInfo;
 declare const graphqlTypeCache: Record<string, GraphQLType>;
 
@@ -104,6 +112,47 @@ const generatedModelArgs: GraphQLFieldConfigArgumentMap =
   generatedDefaultArgs(User);
 const generatedListArgs: GraphQLFieldConfigArgumentMap =
   generatedDefaultListArgs();
+const generatedResolverFactory: GeneratedResolverFactory = generatedResolver;
+const generatedResolverTarget: GeneratedResolverTarget<
+  unknown,
+  ResolverContext
+> = User;
+const generatedResolverOptions: GeneratedResolverOptions<
+  unknown,
+  ResolverContext
+> = {
+  models: { User },
+  requiredFilters: ['organizationId'],
+  before,
+  after,
+  operation: 'update'
+};
+const generatedPreferredResolver: GraphQLFieldResolver<
+  unknown,
+  ResolverContext
+> = generatedResolver(
+  generatedResolverTarget,
+  generatedResolverOptions
+);
+const generatedAssociationResolver: GraphQLFieldResolver<
+  Model,
+  ResolverContext,
+  ConnectionArgs,
+  Promise<unknown>
+> = generatedResolver<Model, ResolverContext, ConnectionArgs>(
+  UserTasks,
+  {
+    before: (options, args, context, resolveInfo) => {
+      void args;
+      void context;
+      void resolveInfo;
+
+      return options;
+    }
+  }
+);
+const options: ResolverOptions = {};
+const associationResolverWithCanonicalOptions = resolver(UserTasks, options);
 const generatedSingleSimplified: GeneratedSimplifiedAST = generatedSimplifyAST(
   info.fieldNodes[0],
   info
@@ -223,6 +272,10 @@ void generatedFields;
 void generatedRecordFields;
 void generatedModelArgs;
 void generatedListArgs;
+void generatedResolverFactory;
+void generatedPreferredResolver;
+void generatedAssociationResolver;
+void associationResolverWithCanonicalOptions;
 void generatedSingleSimplified;
 void generatedCollectionFields;
 void generatedEmptyCollectionFields;
@@ -247,6 +300,19 @@ resolver(User, { requiredFilters: 'organizationId' });
 
 // @ts-expect-error positional models and required filters are no longer accepted.
 resolver(User, { User }, ['organizationId'], { before, after });
+
+// @ts-expect-error generated resolver accepts only target and options.
+generatedResolver(User, { models: { User } }, ['organizationId']);
+
+// @ts-expect-error resolver only supports the update operation.
+generatedResolver(User, { operation: 'create' });
+
+// Association updates are rejected after runtime target resolution.
+const generatedAssociationUpdateResolver = generatedResolver(
+  UserTasks,
+  { operation: 'update' }
+);
+void generatedAssociationUpdateResolver;
 
 // @ts-expect-error resolver options do not accept unknown properties.
 resolver(User, { unsupported: true });

@@ -22,6 +22,24 @@ function isPlainObject(value: unknown): value is WhereExpression {
 }
 
 /**
+ * Read a mapping only when the requested key belongs to the mapping itself.
+ *
+ * @param mapping name-to-key mapping
+ * @param key requested own key
+ * @return mapped value when present
+ */
+function getOwnMappingValue<T>(
+  mapping: Readonly<Record<string, T>>,
+  key: string
+): T | undefined {
+  if (!Object.prototype.hasOwnProperty.call(mapping, key)) {
+    return undefined;
+  }
+
+  return mapping[key];
+}
+
+/**
  * Replace a key deeply in an object
  * @param expression expression to translate
  * @param keyMap GraphQL-friendly keys mapped to Sequelize keys
@@ -37,13 +55,15 @@ function replaceKeyDeep(
   filterableAttributesFields: Readonly<Record<string, string>>,
   allowedModels: readonly string[]
 ): WhereExpression {
-  const result: WhereExpression = {};
+  const result = Object.create(null) as WhereExpression;
 
   return getOwnKeys(expression)
     .reduce((memo, key) => {
       // determine which key we are going to use
-      const targetKey =
-        typeof key === 'string' && keyMap[key] ? keyMap[key] : key;
+      const mappedKey = typeof key === 'string'
+        ? getOwnMappingValue(keyMap, key)
+        : undefined;
+      const targetKey = mappedKey ?? key;
       const value = expression[key];
 
       // On sequelize 4+ operator keys map to Symbols rather than strings (see
@@ -95,8 +115,11 @@ function replaceKeyDeep(
         if (isModel) {
           Object.keys(value).forEach((column) => {
             validateField(column);
-            memo[`$${String(key)}.${filterableAttributesFields[column]}$`] =
-              value[column];
+            const mappedField = getOwnMappingValue(
+              filterableAttributesFields,
+              column
+            );
+            memo[`$${String(key)}.${mappedField ?? column}$`] = value[column];
           });
         } else {
           if (isStringKey) {
