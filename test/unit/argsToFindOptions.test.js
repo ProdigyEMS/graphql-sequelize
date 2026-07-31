@@ -64,4 +64,28 @@ describe('argsToFindOptions', function () {
     expect(findOptions.offset).to.be.equal(0);
     expect(findOptions.limit).to.be.equal(0);
   });
+
+  it('should enforce required filters when where is omitted', function () {
+    expect(() =>
+      argsToFindOptions(
+        { limit: 1 },
+        ['organizationId'],
+        {},
+        [],
+        ['organizationId']
+      )
+    ).to.throw(/Filter organizationId is missing/);
+  });
+
+  it('should reject invalid required filters when where is omitted', function () {
+    expect(() =>
+      argsToFindOptions(
+        { limit: 1 },
+        ['organizationId'],
+        {},
+        [],
+        'organizationId'
+      )
+    ).to.throw(/requiredFilters must contain non-empty strings/);
+  });
 });

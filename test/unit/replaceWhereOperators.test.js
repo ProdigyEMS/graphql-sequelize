@@ -100,7 +100,7 @@ describe('replaceWhereOperators', () => {
       };
 
     }
-    expect(replaceWhereOperators(before, { filterableAttributes: [] })).to.deep.equal(after);
+    expect(replaceWhereOperators(before, { validateAttributes: false })).to.deep.equal(after);
   });
 
   it('should not mutate argument', () => {

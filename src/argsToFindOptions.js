@@ -8,6 +8,20 @@ export default function argsToFindOptions(
   requiredAttributes
 ) {
   var result = {};
+  const whereOptions = {
+    filterableAttributes,
+    filterableAttributesFields,
+    allowedModels,
+    requiredFilters: requiredAttributes
+  };
+
+  if (
+    typeof requiredAttributes !== "undefined" &&
+    (!Array.isArray(requiredAttributes) || requiredAttributes.length > 0) &&
+    (!args || args.where === null || typeof args.where === "undefined")
+  ) {
+    replaceWhereOperators({}, whereOptions);
+  }
 
   if (args) {
     Object.keys(args).forEach(function(key) {
@@ -39,12 +53,7 @@ export default function argsToFindOptions(
         } else if (key === "where") {
           // setup where
           // args.where is client-supplied, so attribute validation stays on.
-          result.where = replaceWhereOperators(args.where, {
-            filterableAttributes,
-            filterableAttributesFields,
-            allowedModels,
-            requiredFilters: requiredAttributes
-          });
+          result.where = replaceWhereOperators(args.where, whereOptions);
         } else if (~filterableAttributes.indexOf(key)) {
           result.where = result.where || {};
           result.where[key] = args[key];

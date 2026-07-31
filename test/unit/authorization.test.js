@@ -74,6 +74,15 @@ describe('authorization: filterable attributes', function () {
       ).to.throw(/Unknown attribute: secret/);
     });
 
+    it('validates attributes whose values are arrays', function () {
+      expect(() =>
+        replaceWhereOperators(
+          { secret: [1, 2] },
+          { filterableAttributes: ['allowed'] }
+        )
+      ).to.throw(/Unknown attribute: secret/);
+    });
+
     it('enforces requiredFilters when the filter is absent', function () {
       expect(() =>
         replaceWhereOperators(
@@ -84,6 +93,20 @@ describe('authorization: filterable attributes', function () {
           }
         )
       ).to.throw(/Filter organizationId is missing/);
+    });
+
+    it('rejects invalid required filter names', function () {
+      [[''], [undefined], Array(1)].forEach((requiredFilters) => {
+        expect(() =>
+          replaceWhereOperators(
+            {},
+            {
+              filterableAttributes: [],
+              requiredFilters
+            }
+          )
+        ).to.throw(/requiredFilters must contain non-empty strings/);
+      });
     });
 
     it('passes when a required filter is present', function () {
@@ -123,6 +146,123 @@ describe('authorization: filterable attributes', function () {
           }
         )
       ).to.not.throw();
+    });
+
+    it('requires every or branch to supply each required filter', function () {
+      expect(() =>
+        replaceWhereOperators(
+          {
+            or: [
+              { organizationId: 1, departmentId: 10 },
+              { organizationId: 2 }
+            ]
+          },
+          {
+            filterableAttributes: ['organizationId', 'departmentId'],
+            requiredFilters: ['organizationId', 'departmentId']
+          }
+        )
+      ).to.throw(/Filter departmentId is missing/);
+    });
+
+    it('requires every object-form or branch to supply the filter', function () {
+      expect(() =>
+        replaceWhereOperators(
+          { or: { organizationId: 1, allowed: 2 } },
+          {
+            filterableAttributes: ['organizationId', 'allowed'],
+            requiredFilters: ['organizationId']
+          }
+        )
+      ).to.throw(/Filter organizationId is missing/);
+    });
+
+    it('does not accept an empty or as a required filter', function () {
+      expect(() =>
+        replaceWhereOperators(
+          { or: [] },
+          {
+            filterableAttributes: ['organizationId'],
+            requiredFilters: ['organizationId']
+          }
+        )
+      ).to.throw(/Filter organizationId is missing/);
+    });
+
+    it('does not accept a required filter nested inside another attribute', function () {
+      expect(() =>
+        replaceWhereOperators(
+          { allowed: { organizationId: { eq: 7 } } },
+          {
+            filterableAttributes: ['allowed', 'organizationId'],
+            requiredFilters: ['organizationId']
+          }
+        )
+      ).to.throw(/Filter organizationId is missing/);
+    });
+
+    it('does not accept a required filter beneath not', function () {
+      expect(() =>
+        replaceWhereOperators(
+          { not: { organizationId: 1 } },
+          {
+            filterableAttributes: ['organizationId'],
+            requiredFilters: ['organizationId']
+          }
+        )
+      ).to.throw(/Filter organizationId is missing/);
+    });
+
+    it('does not accept negative operators on a required filter', function () {
+      ['ne', 'notIn', 'notLike'].forEach((operator) => {
+        expect(() =>
+          replaceWhereOperators(
+            { organizationId: { [operator]: 1 } },
+            {
+              filterableAttributes: ['organizationId'],
+              requiredFilters: ['organizationId']
+            }
+          )
+        ).to.throw(/Filter organizationId is missing/);
+      });
+    });
+
+    it('only accepts equality or membership operators on a required filter', function () {
+      expect(() =>
+        replaceWhereOperators(
+          { organizationId: { gt: 1 } },
+          {
+            filterableAttributes: ['organizationId'],
+            requiredFilters: ['organizationId']
+          }
+        )
+      ).to.throw(/Filter organizationId is missing/);
+
+      ['eq', 'in', 'is'].forEach((operator) => {
+        expect(() =>
+          replaceWhereOperators(
+            { organizationId: { [operator]: 1 } },
+            {
+              filterableAttributes: ['organizationId'],
+              requiredFilters: ['organizationId']
+            }
+          )
+        ).to.not.throw();
+      });
+    });
+
+    it('accepts scalar and array shorthand for a required filter', function () {
+      [7, [7, 8]].forEach((value) => {
+        expect(() =>
+          replaceWhereOperators(
+            { organizationId: value },
+            {
+              filterableAttributes: ['organizationId'],
+              requiredFilters: ['organizationId']
+            }
+          )
+        ).to.not.throw();
+      });
     });
 
     it('accepts a required filter satisfied several levels down', function () {
