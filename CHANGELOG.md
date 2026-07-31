@@ -2,7 +2,7 @@
 
 All notable changes to the ProdigyEMS fork are documented here.
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-07-31
 
 ### Breaking
 
