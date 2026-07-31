@@ -114,8 +114,8 @@ export function toGraphQL(sequelizeType, sequelizeTypes) {
 
   if (sequelizeType instanceof VIRTUAL) {
     let returnType = sequelizeType.returnType
-        ? toGraphQL(sequelizeType.returnType, sequelizeTypes)
-        : GraphQLString;
+      ? toGraphQL(sequelizeType.returnType, sequelizeTypes)
+      : GraphQLString;
     return returnType;
   }
 

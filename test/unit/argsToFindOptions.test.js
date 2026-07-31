@@ -4,7 +4,10 @@ import { expect } from 'chai';
 import argsToFindOptions from '../../src/argsToFindOptions';
 
 describe('argsToFindOptions', function () {
-  var targetAttributes = ['order', 'limit', 'offset'];
+  // 'property' is included because these specs filter on it. Scalar where
+  // values are validated against the filterable set like any other attribute
+  // reference, so an attribute a spec filters on has to be declared here.
+  var targetAttributes = ['order', 'limit', 'offset', 'property'];
 
   it('should return empty with no args or attributes', function () {
     var findOptions = argsToFindOptions(null, null);
@@ -12,7 +15,7 @@ describe('argsToFindOptions', function () {
   });
 
   it('should not include "order" when present in both args and targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { property: 1 }, order: 'order' }, targetAttributes);
+    var findOptions = argsToFindOptions({ where: { property: 1 }, order: 'order' }, targetAttributes, {}, [], []);
 
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).not.to.have.ownProperty('order');
@@ -21,7 +24,7 @@ describe('argsToFindOptions', function () {
   });
 
   it('should not include "limit" when present in both args targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { property: 1 }, limit: 1 }, targetAttributes);
+    var findOptions = argsToFindOptions({ where: { property: 1 }, limit: 1 }, targetAttributes, {}, [], []);
 
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).not.to.have.ownProperty('limit');
@@ -30,7 +33,7 @@ describe('argsToFindOptions', function () {
   });
 
   it('should not include "offset" when present in both args and targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { property: 1 }, offset: 1 }, targetAttributes);
+    var findOptions = argsToFindOptions({ where: { property: 1 }, offset: 1 }, targetAttributes, {}, [], []);
 
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).not.to.have.ownProperty('offset');
@@ -39,13 +42,13 @@ describe('argsToFindOptions', function () {
   });
 
   it('should allow filtering by "order" column when in targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { order: 1 } });
+    var findOptions = argsToFindOptions({ where: { order: 1 } }, targetAttributes, {}, [], []);
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).to.have.ownProperty('order');
   });
 
   it('should allow filtering and ordering by "order" column when in targetAttributes', function () {
-    var findOptions = argsToFindOptions({ where: { order: 1 }, order: 'order' });
+    var findOptions = argsToFindOptions({ where: { order: 1 }, order: 'order' }, targetAttributes, {}, [], []);
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).to.have.ownProperty('order');
     expect(findOptions).to.have.ownProperty('order');
@@ -53,12 +56,36 @@ describe('argsToFindOptions', function () {
   });
 
   it('should allow value = 0', function () {
-    var findOptions = argsToFindOptions({ where: { order: 0 }, offset: 0, limit: 0 }, []);
+    var findOptions = argsToFindOptions({ where: { order: 0 }, offset: 0, limit: 0 }, ['order'], {}, [], []);
     expect(findOptions).to.have.ownProperty('where');
     expect(findOptions.where).to.have.ownProperty('order');
     expect(findOptions).to.have.ownProperty('offset');
     expect(findOptions.where.order).to.be.equal(0);
     expect(findOptions.offset).to.be.equal(0);
     expect(findOptions.limit).to.be.equal(0);
+  });
+
+  it('should enforce required filters when where is omitted', function () {
+    expect(() =>
+      argsToFindOptions(
+        { limit: 1 },
+        ['organizationId'],
+        {},
+        [],
+        ['organizationId']
+      )
+    ).to.throw(/Filter organizationId is missing/);
+  });
+
+  it('should reject invalid required filters when where is omitted', function () {
+    expect(() =>
+      argsToFindOptions(
+        { limit: 1 },
+        ['organizationId'],
+        {},
+        [],
+        'organizationId'
+      )
+    ).to.throw(/requiredFilters must contain non-empty strings/);
   });
 });

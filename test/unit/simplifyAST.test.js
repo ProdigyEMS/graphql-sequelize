@@ -1,8 +1,15 @@
 'use strict';
 
 import {expect} from 'chai';
+import {
+  graphql,
+  GraphQLInt,
+  GraphQLObjectType,
+  GraphQLSchema,
+  GraphQLString
+} from 'graphql';
 import simplifyAST from '../../src/simplifyAST';
-var parser = require('graphql/language/parser').parse // eslint-disable-line
+var parser = require('graphql/language/parser').parse
   , parse = function (query) {
     return parser(query).definitions[0];
   };
@@ -172,6 +179,55 @@ describe('simplifyAST', function () {
         }
       }
     });
+  });
+
+  it('should simplify a variable-backed field argument from resolver info', async function () {
+    let simplified;
+    const viewerType = new GraphQLObjectType({
+      name: 'SimplifyASTVariableViewer',
+      fields: {
+        item: {
+          type: GraphQLString,
+          args: {
+            limit: {
+              type: GraphQLInt
+            }
+          }
+        }
+      }
+    });
+    const schema = new GraphQLSchema({
+      query: new GraphQLObjectType({
+        name: 'SimplifyASTVariableQuery',
+        fields: {
+          viewer: {
+            type: viewerType,
+            resolve(source, args, context, info) {
+              simplified = simplifyAST(info.fieldNodes, info);
+
+              return {};
+            }
+          }
+        }
+      })
+    });
+
+    const result = await graphql({
+      schema,
+      source: `
+        query SimplifyASTVariable($limit: Int) {
+          viewer {
+            item(limit: $limit)
+          }
+        }
+      `,
+      variableValues: {
+        limit: 2
+      }
+    });
+
+    expect(result.errors).to.equal(undefined);
+    expect(simplified.fields.item.args.limit).to.equal(2);
   });
 
   it('should simplify a basic structure with an inline fragment', function () {

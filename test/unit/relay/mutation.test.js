@@ -4,7 +4,7 @@ import {expect} from 'chai';
 import Sequelize from 'sequelize';
 import sinon from 'sinon';
 import attributeFields from '../../../src/attributeFields';
-import { sequelize } from '../../support/helper'
+import { sequelize } from '../../support/helper';
 
 import {
   sequelizeConnection
@@ -12,22 +12,16 @@ import {
 
 import {
   GraphQLString,
-  GraphQLInt,
-  GraphQLFloat,
   GraphQLNonNull,
-  GraphQLBoolean,
   GraphQLEnumType,
-  GraphQLList,
   GraphQLObjectType,
   GraphQLSchema,
-  GraphQLID,
   graphql
 } from 'graphql';
 
 import {
   globalIdField,
   toGlobalId,
-  fromGlobalId,
   mutationWithClientMutationId
 } from 'graphql-relay';
 
@@ -128,7 +122,7 @@ describe('relay', function () {
       });
 
       beforeEach(function () {
-        this.sinon = sinon.sandbox.create();
+        this.sinon = sinon.createSandbox();
 
         this.viewer = this.User.build({
           id: Math.ceil(Math.random() * 999)
@@ -152,24 +146,28 @@ describe('relay', function () {
             userId: this.viewer.get('id')
           }));
 
-          let result = await graphql(this.schema, `
-            mutation {
-              addTask(input: {title: "${title}", clientMutationId: "${Math.random().toString()}"}) {
-                task {
-                  id
-                }
-
-                newTaskEdge {
-                  cursor
-                  node {
+          let result = await graphql({
+            schema: this.schema,
+            source: `
+              mutation {
+                addTask(input: {title: "${title}", clientMutationId: "${Math.random().toString()}"}) {
+                  task {
                     id
-                    title
+                  }
+
+                  newTaskEdge {
+                    cursor
+                    node {
+                      id
+                      title
+                    }
                   }
                 }
               }
+            `,
+            contextValue: {
+              viewer: this.viewer
             }
-          `, null, {
-            viewer: this.viewer
           });
 
           if (result.errors) throw new Error(result.errors[0].stack);

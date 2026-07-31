@@ -57,7 +57,10 @@ export function idFetcher(sequelize, nodeTypeMapper) {
 
     const model = Object.keys(sequelize.models).find(model => model === type);
     if (model) {
-      return sequelize.models[model].findById(id);
+      const target = sequelize.models[model];
+      // findById was renamed to findByPk in sequelize 5 and removed in 6.
+      // peerDependencies still allow >=3.0.0, so support both spellings.
+      return target.findByPk ? target.findByPk(id) : target.findById(id);
     }
 
     if (nodeType) {
@@ -69,13 +72,24 @@ export function idFetcher(sequelize, nodeTypeMapper) {
 }
 
 export function typeResolver(nodeTypeMapper) {
-  return (obj, context, info) => {
+  return (obj) => {
+    // Sequelize 6 instances expose neither `.Model` nor `._modelOptions` --
+    // both were removed after v3 -- so the old chain fell through to
+    // `obj.name`, which on a model instance is the value of its `name`
+    // column. The type lookup then failed and node queries resolved to null.
+    // getModelOfInstance handles the modern shape (instance.constructor) and
+    // still falls back to `.Model` for older sequelize versions, which the
+    // peerDependency range still permits.
+    const modelOfInstance = getModelOfInstance(obj);
+
     var type = obj.__graphqlType__
-               || (obj.Model
-                 ? obj.Model.options.name.singular
+               || (modelOfInstance && modelOfInstance.options
+                 ? modelOfInstance.options.name.singular
                  : obj._modelOptions
-                 ? obj._modelOptions.name.singular
-                 : obj.name);
+                   ? obj._modelOptions.name.singular
+                   : obj.constructor && obj.constructor.options
+                     ? obj.constructor.options.name.singular
+                     : obj.name);
 
     if (!type) {
       throw new Error(`Unable to determine type of ${ typeof obj }. ` +
@@ -84,7 +98,7 @@ export function typeResolver(nodeTypeMapper) {
 
     const nodeType = nodeTypeMapper.item(type);
     if (nodeType) {
-      return typeof nodeType.type === 'string' ? info.schema.getType(nodeType.type) : nodeType.type;
+      return typeof nodeType.type === 'string' ? nodeType.type : nodeType.type.name;
     }
 
     return null;
@@ -118,6 +132,56 @@ export function nodeType(connectionType) {
   return connectionType._fields.edges.type.ofType._fields.node.type;
 }
 
+/**
+ * Build sequelize order terms for dialects that do not accept the SQL
+ * NULLS FIRST/LAST suffix.
+ *
+ * @param {Model} model sequelize model being ordered
+ * @param {String|Object} orderAttribute requested order attribute
+ * @param {String} orderDirection requested direction and null placement
+ * @return {Array} sequelize order terms
+ */
+function normalizeNullOrdering(model, orderAttribute, orderDirection) {
+  const dialect = model.sequelize.dialect.name;
+  const nullOrder = /^(ASC|DESC) NULLS (FIRST|LAST)$/.exec(orderDirection);
+
+  if (
+    !['mssql', 'mysql'].includes(dialect) ||
+    typeof orderAttribute !== 'string' ||
+    !nullOrder
+  ) {
+    return [[orderAttribute, orderDirection]];
+  }
+
+  const [, direction, nullPlacement] = nullOrder;
+  const usesNativeNullOrder =
+    (direction === 'ASC' && nullPlacement === 'FIRST') ||
+    (direction === 'DESC' && nullPlacement === 'LAST');
+
+  if (usesNativeNullOrder) {
+    return [[orderAttribute, direction]];
+  }
+
+  const queryInterface = model.sequelize.getQueryInterface();
+  const queryGenerator =
+    queryInterface.queryGenerator || queryInterface.QueryGenerator;
+  const attribute = model.getAttributes()[orderAttribute];
+  const columnName = attribute ? attribute.field : orderAttribute;
+  const qualifiedColumn =
+    `${queryGenerator.quoteIdentifier(model.name)}.` +
+    `${queryGenerator.quoteIdentifier(columnName)}`;
+  const nullRank = nullPlacement === 'FIRST' ? 0 : 1;
+  const nonNullRank = nullRank === 0 ? 1 : 0;
+  const rankExpression = model.sequelize.literal(
+    `CASE WHEN ${qualifiedColumn} IS NULL THEN ${nullRank} ELSE ${nonNullRank} END`
+  );
+
+  return [
+    [rankExpression, 'ASC'],
+    [orderAttribute, direction]
+  ];
+}
+
 export function createConnectionResolver({
   target: targetMaybeThunk,
   before,
@@ -134,12 +198,26 @@ export function createConnectionResolver({
   };
 
   let orderByDirection = function (orderDirection, args) {
-    if (args.last) {
-      return orderDirection.indexOf('ASC') >= 0
-              ? orderDirection.replace('ASC', 'DESC')
-              : orderDirection.replace('DESC', 'ASC');
+    if (!args.last) {
+      return orderDirection;
     }
-    return orderDirection;
+
+    const parsedDirection =
+      /^(ASC|DESC)(?: NULLS (FIRST|LAST))?$/.exec(orderDirection);
+    if (!parsedDirection) {
+      return orderDirection;
+    }
+
+    const [, direction, nullPlacement] = parsedDirection;
+    const reversedDirection = direction === 'ASC' ? 'DESC' : 'ASC';
+    if (!nullPlacement) {
+      return reversedDirection;
+    }
+
+    const reversedNullPlacement =
+      nullPlacement === 'FIRST' ? 'LAST' : 'FIRST';
+
+    return `${reversedDirection} NULLS ${reversedNullPlacement}`;
   };
 
   /**
@@ -151,8 +229,8 @@ export function createConnectionResolver({
   let toCursor = function (item, index) {
     const model = getModelOfInstance(item);
     const id = model ?
-               typeof model.primaryKeyAttribute === 'string' ? item[model.primaryKeyAttribute] : null :
-               item[Object.keys(item)[0]];
+      typeof model.primaryKeyAttribute === 'string' ? item[model.primaryKeyAttribute] : null :
+      item[Object.keys(item)[0]];
     return base64(JSON.stringify([id, index]));
   };
 
@@ -180,7 +258,10 @@ export function createConnectionResolver({
       Object.assign(result, where(key, value, result));
     });
 
-    return replaceWhereOperators(result);
+    // Keys here come from the application's own `where` callback rather than
+    // directly from client input, so attribute validation does not apply.
+    // Stated explicitly so it cannot happen by omission.
+    return replaceWhereOperators(result, { validateAttributes: false });
   };
 
   let resolveEdge = function (item, index, queriedCursor, sourceArgs = {}, source) {
@@ -215,8 +296,8 @@ export function createConnectionResolver({
       orderByEnum = typeof orderByEnum === 'string' ? info.schema.getType(orderByEnum) : orderByEnum;
 
       let orderBy = args.orderBy ? args.orderBy :
-                    orderByEnum ? [orderByEnum._values[0].value] :
-                    [[model.primaryKeyAttribute, 'ASC']];
+        orderByEnum ? [orderByEnum._values[0].value] :
+          [[model.primaryKeyAttribute, 'ASC']];
 
       if (orderByEnum && typeof orderBy === 'string') {
         orderBy = [orderByEnum._nameLookup[args.orderBy].value];
@@ -230,9 +311,11 @@ export function createConnectionResolver({
       });
       let orderDirection = orderByDirection(orderBy[0][1], args);
 
-      options.order = [
-        [orderAttribute, orderDirection]
-      ];
+      options.order = normalizeNullOrdering(
+        model,
+        orderAttribute,
+        orderDirection
+      );
 
       if (orderAttribute !== model.primaryKeyAttribute) {
         options.order.push([model.primaryKeyAttribute, orderByDirection('ASC', args)]);

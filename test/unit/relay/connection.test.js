@@ -72,16 +72,19 @@ describe('relay', function () {
     });
 
     beforeEach(function () {
-      this.sinon = sinon.sandbox.create();
+      this.sinon = sinon.createSandbox();
 
       this.viewer = this.User.build({
         id: Math.ceil(Math.random() * 999)
       });
 
-      const task = this.Task.build();
-      task.dataValues.full_count = Math.random() * 999;
+      const task = this.Task.build({
+        id: 1,
+      });
+
+      task.dataValues['full_count'] = Math.random() * 999;
       this.sinon.stub(this.Task, 'findAll').resolves([task]);
-      this.sinon.stub(this.User, 'findById').resolves(this.User.build());
+      this.sinon.stub(this.User, this.User.findByPk ? 'findByPk' : 'findById').resolves(this.User.build());
     });
 
     afterEach(function () {
@@ -89,20 +92,24 @@ describe('relay', function () {
     });
 
     it('passes context, root and info to before', async function () {
-      const result = await graphql(this.schema, `
-        query {
-          viewer {
-            tasks {
-              edges {
-                node {
-                  id
+      const result = await graphql({
+        schema: this.schema,
+        source: `
+          query {
+            viewer {
+              tasks {
+                edges {
+                  node {
+                    id
+                  }
                 }
               }
             }
           }
-        }
-      `, null, {
-        viewer: this.viewer
+        `,
+        contextValue: {
+          viewer: this.viewer
+        },
       });
 
       if (result.errors) throw new Error(result.errors[0]);

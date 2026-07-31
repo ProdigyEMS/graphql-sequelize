@@ -1,28 +1,33 @@
 {
   "name": "@prodigyems/graphql-sequelize",
-  "version": "0.5.0",
-  "description": "GraphQL & Relay for MySQL & Postgres via Sequelize",
+  "version": "1.0.0",
+  "description": "GraphQL and Relay helpers for Sequelize 6",
   "main": "lib/index.js",
-  "options": {
-    "mocha": "--require scripts/mocha-bootload"
-  },
+  "types": "types/index.d.ts",
+  "type": "commonjs",
   "scripts": {
-    "prepublish": "npm run check && npm run build",
-    "check": "npm run lint && npm run test:unit",
-    "lint": "eslint src",
-    "build": "rm -rf lib/* && babel src --ignore test --out-dir lib",
-    "test": "npm run test:unit && npm run test:docker",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run check && npm run test:package",
+    "check": "npm run lint && npm run test:types && npm run test:unit",
+    "lint": "eslint src test scripts/*.cjs",
+    "build": "node scripts/clean-build.cjs && babel src --ignore test --out-dir lib",
+    "test": "npm run lint && npm run test:types && npm run test:unit && DIALECT=sqlite npm run test:integration && npm run test:package",
     "test:watch": "npm run test:unit -- --watch",
-    "test:unit": "mocha $npm_package_options_mocha test/unit/*.test.js test/unit/**/*.test.js",
-    "build:docker": "docker-compose build",
-    "test:docker": "DIALECT=${DIALECT:=postgres} docker-compose run dev /bin/sh -c \"npm run test:integration\"",
-    "test:integration": "mocha $npm_package_options_mocha test/integration/*.test.js test/integration/**/*.test.js",
+    "test:unit": "npm run build:test && mocha \".build/test/unit/**/*.test.js\"",
+    "test:types": "tsc --project test/types/tsconfig.json",
+    "test:package": "node scripts/verify-package.cjs",
+    "test:graphql17": "sh scripts/test-graphql17.sh",
+    "build:docker": "docker compose build",
+    "test:docker": "bash scripts/test-docker.sh",
+    "test:integration": "npm run build:test && node scripts/run-integration.cjs",
     "psql": "docker run -it --link graphqlsequelize_postgres_1:postgres --rm postgres:9.4 sh -c 'PGPASSWORD=graphql_sequelize_test exec psql -h \"$POSTGRES_PORT_5432_TCP_ADDR\" -p \"$POSTGRES_PORT_5432_TCP_PORT\" -U graphql_sequelize_test'",
-    "cover": "babel-node node_modules/.bin/isparta cover _mocha -- $npm_package_options_mocha test/**/**/*.test.js test/**/*.test.js"
+    "cover": "npm run build:test && c8 --reporter=text --reporter=lcov mocha \".build/test/unit/**/*.test.js\"",
+    "build:test": "rm -rf .build && babel src --out-dir .build/src && babel test --out-dir .build/test --ignore test/benchmark"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mickhansen/graphql-sequelize.git"
+    "url": "git+https://github.com/ProdigyEMS/graphql-sequelize.git"
   },
   "keywords": [
     "graphql",
@@ -34,46 +39,63 @@
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mickhansen/graphql-sequelize/issues"
+    "url": "https://github.com/ProdigyEMS/graphql-sequelize/issues"
   },
-  "homepage": "https://github.com/mickhansen/graphql-sequelize",
+  "homepage": "https://github.com/ProdigyEMS/graphql-sequelize#readme",
+  "files": [
+    "lib/",
+    "types/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "bluebird": "^3.4.0",
     "invariant": "2.2.1",
     "lodash": "^4.0.0"
   },
   "peerDependencies": {
-    "graphql": "^0.5.0 || ^0.6.0 || ^0.7.0 || ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14",
-    "graphql-relay": "^0.4.2 || ^0.5.0 || ^0.6.0",
-    "sequelize": ">=3.0.0"
+    "graphql": "^0.5.0 || ^0.6.0 || ^0.7.0 || ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14 || ^15 || ^16",
+    "graphql-relay": "^0.4.2 || ^0.5.0 || ^0.6.0 || ^0.7.0 || ^0.8.0 || ^0.9.0 || ^0.10.0",
+    "sequelize": "^6.0.0"
   },
   "devDependencies": {
-    "babel-cli": "^6.9.0",
-    "babel-eslint": "^6.0.3",
-    "babel-plugin-transform-object-rest-spread": "^6.8.0",
-    "babel-preset-async-to-bluebird": "^1.1.0",
-    "babel-preset-es2015-node4": "^2.1.0",
-    "babel-register": "^6.9.0",
-    "chai": "^3.0.0",
-    "chai-as-promised": "^5.1.0",
-    "eslint": "^1.7.3",
-    "graphql": "^0.13.0",
-    "graphql-relay": "^0.6.0",
-    "isparta": "^4.0.0",
-    "istanbul": "^0.4.0",
-    "mocha": "^3.0.1",
-    "mysql": "^2.11.1",
-    "pg": "^5.0.0",
-    "pg-hstore": "^2.3.2",
-    "sequelize": "^3.24.6",
-    "sinon": "^1.15.4",
-    "sinon-as-promised": "^4.0.0",
-    "sinon-chai": "^2.8.0",
-    "sqlite3": "^4.0.0"
+    "@babel/cli": "^7.28.3",
+    "@babel/core": "^7.28.4",
+    "@babel/eslint-parser": "^7.28.4",
+    "@babel/preset-env": "^7.28.3",
+    "@babel/register": "^7.28.3",
+    "c8": "^10.1.3",
+    "chai": "^4.5.0",
+    "chai-as-promised": "^7.1.2",
+    "eslint": "^9.37.0",
+    "globals": "^15.15.0",
+    "graphql": "^16.6.0",
+    "graphql-relay": "^0.10.2",
+    "mocha": "^11.7.4",
+    "mysql2": "^3.15.4",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.8",
+    "sinon": "^19.0.5",
+    "sinon-chai": "^3.7.0",
+    "sqlite3": "^6.0.1",
+    "tedious": "^20.0.0",
+    "typescript": "^5.9.3"
   },
   "directories": {
     "doc": "docs",
     "example": "examples",
     "test": "test"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.8",
+    "serialize-javascript": "^7.0.5"
   }
 }

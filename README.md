@@ -1,537 +1,227 @@
-# graphql-sequelize
+# @prodigyems/graphql-sequelize
 
-[![NPM](https://img.shields.io/npm/v/graphql-sequelize.svg)](https://www.npmjs.com/package/graphql-sequelize)
-[![Build Status](https://travis-ci.org/mickhansen/graphql-sequelize.svg?branch=master)](https://travis-ci.org/mickhansen/graphql-sequelize)
-[![Slack](http://sequelize-slack.herokuapp.com/badge.svg)](http://sequelize-slack.herokuapp.com)
-[![Coverage](https://codecov.io/gh/mickhansen/graphql-sequelize/branch/master/graph/badge.svg)](https://codecov.io/gh/mickhansen/graphql-sequelize)
+[![npm](https://img.shields.io/npm/v/%40prodigyems%2Fgraphql-sequelize)](https://www.npmjs.com/package/@prodigyems/graphql-sequelize)
+[![CI](https://github.com/ProdigyEMS/graphql-sequelize/actions/workflows/ci.yml/badge.svg)](https://github.com/ProdigyEMS/graphql-sequelize/actions/workflows/ci.yml)
 
-Should be used with [dataloader-sequelize](https://github.com/mickhansen/dataloader-sequelize) to avoid N+1 queries
+GraphQL and Relay helpers for Sequelize 6. The package maps GraphQL arguments
+to Sequelize queries, exposes Sequelize model attributes as GraphQL fields, and
+provides Relay connection helpers.
 
-- [Installation](#installation)
-- [Resolve helpers](#resolve-helpers)
-- [field helpers](#field-helpers)
-- [args helpers](#args-helpers)
+This is the maintained ProdigyEMS fork. Version 1.0 intentionally has a smaller,
+safer resolver contract than the final 0.5 release.
 
 ## Installation
 
-`$ npm install --save graphql-sequelize`
+Install the package and its peer dependencies:
 
-graphql-sequelize assumes you have graphql and sequelize installed.
-
-## Resolve helpers
-
-```js
-import { resolver } from "graphql-sequelize";
-
-resolver(SequelizeModel[, options]);
+```sh
+npm install @prodigyems/graphql-sequelize graphql@^16 graphql-relay@^0.10 sequelize@^6
 ```
 
-A helper for resolving graphql queries targeted at Sequelize models or associations.
-Please take a look at [the tests](https://github.com/mickhansen/graphql-sequelize/blob/master/test/integration/resolver.test.js) to best get an idea of implementation.
+The normal dependency graph is verified with GraphQL 16, graphql-relay 0.10,
+and Sequelize 6. See [GraphQL compatibility](#graphql-compatibility) for the
+separate GraphQL 17 lane.
 
-### Features
+CommonJS and transpiled ES module imports are both supported:
 
-- Automatically converts args to where if arg keys matches model attributes
-- Automatically converts an arg named 'limit' to a sequelize limit
-- Automatically converts an arg named 'order' to a sequelize order
+```js
+const {
+  attributeFields,
+  resolver,
+  sequelizeConnection
+} = require('@prodigyems/graphql-sequelize');
+```
 
-### Relay & Connections
+```js
+import {
+  attributeFields,
+  resolver,
+  sequelizeConnection
+} from '@prodigyems/graphql-sequelize';
+```
 
-[Relay documentation](docs/relay.md)
+## Resolver
+
+`resolver` accepts exactly two arguments: a Sequelize model, association, or
+target thunk, followed by one options object.
+
+```js
+const resolveUsers = resolver(User, {
+  models: { User, Organization },
+  requiredFilters: ['organizationId'],
+  list: true,
+  before: async (findOptions, args, context, info) => findOptions,
+  after: async (result, args, context, info) => result
+});
+```
+
+The returned function is a standard GraphQL field resolver. It maps filterable
+GraphQL arguments to `where`, supports Relay connections, and chooses
+`findOne` or `findAll` from the field type unless `list` is explicit.
 
 ### Options
 
-The `resolver` function takes a model as its first (required) argument, but also
-has a second options object argument. The available options are:
+- `models`: model registry used to validate qualified filters.
+- `requiredFilters`: attribute names that every accepted filter expression
+  must constrain structurally.
+- `list`: explicitly select list or single-result behavior.
+- `handleConnection`: enable Relay connection conversion; defaults to `true`.
+- `operation`: use `'update'` for update resolvers.
+- `contextToOptions`: map context properties to Sequelize find options.
+- `before(findOptions, args, context, info)`: transform query options.
+- `after(result, args, context, info)`: transform the resolved value.
+
+`include` is intentionally unsupported. Use
+[dataloader-sequelize](https://github.com/mickhansen/dataloader-sequelize) or
+association resolvers for batching.
+
+### Required-filter security
+
+`requiredFilters` is an authorization boundary, not a hint. Each named filter
+must be a positive structural constraint in the submitted expression:
+
+- every `OR` branch must retain the constraint;
+- an `AND` expression may inherit a constraint from a sibling term;
+- `NOT`, negative operators, ranges, unrelated nested fields, and empty
+  branches do not satisfy the requirement;
+- missing or malformed `where` input fails closed; and
+- unknown fields are rejected, including unknown fields inside arrays.
+
+This prevents a caller from weakening an organization or tenant scope by
+placing it in only one logical branch. Continue to apply server-owned
+authorization in `before`; never accept an authorization value solely because
+the client supplied it.
+
+## Migrating from 0.5 to 1.0
+
+The old positional extension arguments are unsupported. Move `models` and
+required filters into the single options object.
 
 ```js
-resolver(SequelizeModel, {
-  // Whether or not this should return a list. Defaults to whether or not the
-  // field type is an instance of `GraphQLList`.
-  list: false,
+// 0.5 positional form — rejected by 1.0
+resolver(User, models, ['organizationId'], {
+  before,
+  after
+});
 
-  // Whether or not relay connections should be handled. Defaults to `true`.
-  handleConnection: true,
+// 1.0 canonical form
+resolver(User, {
+  models,
+  requiredFilters: ['organizationId'],
+  before,
+  after
+});
+```
 
-  /**
-   * Manipulate the query before it's sent to Sequelize.
-   * @param findOptions {object} - Options sent to Seqeulize model's find function
-   * @param args {object} - The arguments from the incoming GraphQL query
-   * @param context {object} - Resolver context, see more at GraphQL docs below.
-   * @returns findOptions or promise that resolves with findOptions
-   */
-  before: (findOptions, args, context) => {
-    findOptions.where = { /* Custom where arguments */ };
+There is no compatibility adapter. Passing more than two arguments throws with
+a migration message so an authorization filter cannot be silently dropped.
+
+Other 1.0 migration notes:
+
+- Sequelize versions before 6 are no longer supported.
+- Package-owned TypeScript declarations replace consumer ambient declarations.
+- Root CommonJS exports are directly callable; no `.default` unwrapping is
+  needed.
+- `limit: 0` returns an empty association result consistently.
+- Relay null ordering translates unsupported `NULLS FIRST`/`NULLS LAST`
+  syntax for SQL Server and MySQL while preserving native PostgreSQL and SQLite
+  syntax.
+
+## TypeScript
+
+Declarations ship at `types/index.d.ts` and cover resolver targets and options,
+hooks, field helpers, scalars, and Relay helpers.
+
+```ts
+import {
+  resolver,
+  type ResolverOptions
+} from '@prodigyems/graphql-sequelize';
+
+const options: ResolverOptions<unknown, RequestContext> = {
+  requiredFilters: ['organizationId'],
+  before: async (findOptions, _args, context) => {
+    findOptions.transaction = context.transaction;
+
     return findOptions;
-  },
-  /**
-   * Manipulate the Sequelize find results before it's sent back to the requester.
-   * @param result {object|array} - Result of the query, object or array depending on list or not.
-   * @param args {object} - The arguments from the incoming GraphQL query
-   * @param context {object} - Resolver context, see more at GraphQL docs below.
-   * @returns result(s) or promise that resolves with result(s)
-   */
-  after: (result, args, context) => {
-    result.sort(/* Custom sort function */);
-    return result;
-  },
-
-  /*
-   * Transfer fields from the graphql context to the options passed to model calls
-   * Inherits from global resolver.contextToOptions
-   */
-  contextToOptions: {
-    a: 'a',
-    b: 'c'
   }
-});
+};
 
-resolver.contextToOptions = {}; /* Set contextToOptions globally */
+const resolveUsers = resolver(User, options);
 ```
 
-_The `args` and `context` parameters are provided by GraphQL. More information
-about those is available in their [resolver docs](http://graphql.org/learn/execution/#root-fields-resolvers)._
+The declaration intentionally rejects the legacy positional resolver form and
+the removed `include` option.
 
-### Examples
+## GraphQL compatibility
+
+The published peer range supports GraphQL through 16. GraphQL 17 is exercised
+in an isolated compatibility lane with npm's permissive peer resolver because
+`graphql-relay@0.10.2` still declares a GraphQL peer capped at `^16.2.0`.
+
+That lane demonstrates runtime compatibility; it does not make a normal strict
+GraphQL 17 install satisfiable. Consumers choosing GraphQL 17 must opt into
+their package manager's peer override or permissive mode until graphql-relay
+publishes a compatible peer range. The compatibility script restores the
+strict locked GraphQL 16 dependency graph when it exits.
+
+## Field and argument helpers
+
+### `attributeFields(model, options)`
+
+Builds a GraphQL field map from Sequelize attributes. Options include `only`,
+`exclude`, `map`, `globalId`, `allowNull`, and `commentToDescription`.
 
 ```js
-import {resolver} from 'graphql-sequelize';
-
-let User = sequelize.define('user', {
-  name: Sequelize.STRING
-});
-
-let Task = sequelize.define('task', {
-  title: Sequelize.STRING
-});
-
-User.Tasks = User.hasMany(Task, {as: 'tasks'});
-
-let taskType = new GraphQLObjectType({
-  name: 'Task',
-  description: 'A task',
-  fields: {
-    id: {
-      type: new GraphQLNonNull(GraphQLInt),
-      description: 'The id of the task.',
-    },
-    title: {
-      type: GraphQLString,
-      description: 'The title of the task.',
-    }
-  }
-});
-
-let userType = new GraphQLObjectType({
+const userType = new GraphQLObjectType({
   name: 'User',
-  description: 'A user',
-  fields: {
-    id: {
-      type: new GraphQLNonNull(GraphQLInt),
-      description: 'The id of the user.',
-    },
-    name: {
-      type: GraphQLString,
-      description: 'The name of the user.',
-    },
-    tasks: {
-      type: new GraphQLList(taskType),
-      resolve: resolver(User.Tasks)
-    }
-  }
-});
-
-let schema = new GraphQLSchema({
-  query: new GraphQLObjectType({
-    name: 'RootQueryType',
-    fields: {
-      // Field for retrieving a user by ID
-      user: {
-        type: userType,
-        // args will automatically be mapped to `where`
-        args: {
-          id: {
-            description: 'id of the user',
-            type: new GraphQLNonNull(GraphQLInt)
-          }
-        },
-        resolve: resolver(User)
-      },
-
-      // Field for searching for a user by name
-      userSearch: {
-        type: new GraphQLList(userType),
-        args: {
-          query: {
-            description: "Fuzzy-matched name of user",
-            type: new GraphQLNonNull(GraphQLString),
-          }
-        },
-        resolve: resolver(User, {
-          // Custom `where` clause that fuzzy-matches user's name and
-          // alphabetical sort by username
-          before: (findOptions, args) => {
-            findOptions.where = {
-              name: { "$like": `%${args.query}%` },
-            };
-            findOptions.order = [['name', 'ASC']];
-            return findOptions;
-          },
-          // Custom sort override for exact matches first
-          after: (results, args) => {
-            return results.sort((a, b) => {
-              if (a.name === args.query) {
-                return 1;
-              }
-              else if (b.name === args.query) {
-                return -1;
-              }
-
-              return 0;
-            });
-          }
-        })
-      }
-    }
-  })
-});
-
-let schema = new GraphQLSchema({
-  query: new GraphQLObjectType({
-    name: 'RootQueryType',
-    fields: {
-      users: {
-        // The resolver will use `findOne` or `findAll` depending on whether the field it's used in is a `GraphQLList` or not.
-        type: new GraphQLList(userType),
-        args: {
-          // An arg with the key limit will automatically be converted to a limit on the target
-          limit: {
-            type: GraphQLInt
-          },
-          // An arg with the key order will automatically be converted to a order on the target
-          order: {
-            type: GraphQLString
-          }
-        },
-        resolve: resolver(User)
-      }
-    }
+  fields: attributeFields(User, {
+    exclude: ['passwordHash'],
+    commentToDescription: true
   })
 });
 ```
 
-## field helpers
+### `defaultArgs(model)` and `defaultListArgs()`
 
-field helpers help you automatically define a models attributes as fields for a GraphQL object type.
+`defaultArgs` builds arguments for a model's primary key.
+`defaultListArgs` supplies common list arguments such as `limit`, `order`, and
+`where`.
 
-```js
-var Model = sequelize.define('User', {
-  email: {
-    type: Sequelize.STRING,
-    allowNull: false
-  },
-  firstName: {
-    type: Sequelize.STRING
-  },
-  lastName: {
-    type: Sequelize.STRING
-  }
-});
+### `typeMapper`
 
-import {attributeFields} from 'graphql-sequelize';
+`typeMapper.toGraphQL` converts supported Sequelize data types to GraphQL
+types. Add a focused mapper with `typeMapper.mapType` when an application uses
+a custom Sequelize type.
 
-attributeFields(Model, {
-  // ... options
-  exclude: Array, // array of model attributes to ignore - default: []
-  only: Array, // only generate definitions for these model attributes - default: null
-  globalId: Boolean, // return an relay global id field - default: false
-  map: Object, // rename fields - default: {}
-  allowNull: Boolean, // disable wrapping mandatory fields in `GraphQLNonNull` - default: false
-  commentToDescription: Boolean, // convert model comment to GraphQL description - default: false
-  cache: Object, // Cache enum types to prevent duplicate type name error - default: {}
-});
+### Scalars
 
-/*
-{
-  id: {
-    type: new GraphQLNonNull(GraphQLInt)
-  },
-  email: {
-    type: new GraphQLNonNull(GraphQLString)
-  },
-  firstName: {
-    type: GraphQLString
-  },
-  lastName: {
-    type: GraphQLString
-  }
-}
-*/
+`JSONType` and `DateType` are ready-to-use GraphQL scalar types.
 
-userType = new GraphQLObjectType({
-  name: 'User',
-  description: 'A user',
-  fields: Object.assign(attributeFields(Model), {
-    // ... extra fields
-  })
-});
-```
-### Providing custom types
+## Relay
 
-`attributeFields` uses the graphql-sequelize `typeMapper` to map Sequelize types to GraphQL types. You can supply your own
-mapping function to override this behavior using the `mapType` export.
+The root package exports `relay`, `sequelizeConnection`, `createConnection`,
+`createConnectionResolver`, and `createNodeInterface`. See the
+[Relay guide](https://github.com/ProdigyEMS/graphql-sequelize/blob/master/docs/relay.md)
+for connection configuration and pagination examples.
 
-```js
-var Model = sequelize.define('User', {
-  email: {
-    type: Sequelize.STRING,
-    allowNull: false
-  },
-  isValid: {
-    type: Sequelize.BOOLEAN,
-    allowNull: false
-  }
-});
+## Development
 
-import {attributeFields,typeMapper} from 'graphql-sequelize';
-typeMapper.mapType((type) => {
-   //map bools as strings
-   if (type instanceof Sequelize.BOOLEAN) {
-     return GraphQLString
-   }
-   //use default for everything else
-   return false
-});
-
-//map fields
-attributeFields(Model);
-
-/*
-{
-  id: {
-    type: new GraphQLNonNull(GraphQLInt)
-  },
-  email: {
-    type: new GraphQLNonNull(GraphQLString)
-  },
-  isValid: {
-      type: new GraphQLNonNull(GraphQLString)
-  },
-}
-*/
-
+```sh
+npm ci
+npm run check
+DIALECT=sqlite npm run test:integration
+npm run test:package
 ```
 
-### Renaming generated fields
+`npm run test:package` deletes local build output, runs the real npm pack
+lifecycle, verifies the exact tarball contents, installs that tarball in a clean
+temporary consumer, and loads its public APIs.
 
-attributeFields accepts a ```map``` option to customize the way the attribute fields are named. The ```map``` option accepts
-an object or a function that returns a string.
+Release operators should follow
+[RELEASING.md](https://github.com/ProdigyEMS/graphql-sequelize/blob/master/RELEASING.md).
+Changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
-```js
+## License
 
-var Model = sequelize.define('User', {
-  email: {
-    type: Sequelize.STRING,
-    allowNull: false
-  },
-  firstName: {
-    type: Sequelize.STRING
-  },
-  lastName: {
-    type: Sequelize.STRING
-  }
-});
-
-attributeFields(Model, {
-    map:{
-        email:"Email",
-        firstName:"FirstName",
-        lastName:"LastName"
-    }
-});
-
-/*
-{
-  id: {
-    type: new GraphQLNonNull(GraphQLInt)
-  },
-  Email: {
-    type: new GraphQLNonNull(GraphQLString)
-  },
-  FirstName: {
-    type: GraphQLString
-  },
-  LastName: {
-    type: GraphQLString
-  }
-}
-*/
-
-attributeFields(Model, {
-    map:(k) => k.toLowerCase()
-});
-
-/*
-{
-  id: {
-    type: new GraphQLNonNull(GraphQLInt)
-  },
-  email: {
-    type: new GraphQLNonNull(GraphQLString)
-  },
-  firstname: {
-    type: GraphQLString
-  },
-  lastname: {
-    type: GraphQLString
-  }
-}
-*/
-
-```
-
-### ENUM attributes with non-alphanumeric characters
-
-GraphQL enum types [only support ASCII alphanumeric characters, digits and underscores with leading non-digit](https://facebook.github.io/graphql/#Name).
-If you have other characters, like a dash (`-`) in your Sequelize enum types,
-they will be converted to camelCase. If your enum value starts from a digit, it
-will be prepended with an underscore.
-
-For example:
-
-- `foo-bar` becomes `fooBar`
-
-- `25.8` becomes `_258`
-
-### VIRTUAL attributes and GraphQL fields
-
-If you have `Sequelize.VIRTUAL` attributes on your sequelize model, you need to explicitly set the return type and any field dependencies via `new Sequelize.VIRTUAL(returnType, [dependencies ... ])`.
-
-For example, `fullName` here will not always return valid data when queried via GraphQL:
-```js
-firstName: { type: Sequelize.STRING },
-lastName: { type: Sequelize.STRING },
-fullName: {
-  type: Sequelize.VIRTUAL,
-  get: function() { return `${this.firstName} ${this.lastName}`; },
-},
-```
-
-To work properly `fullName` needs to be more fully specified:
-
-```js
-firstName: { type: Sequelize.STRING },
-lastName: { type: Sequelize.STRING },
-fullName: {
-  type: new Sequelize.VIRTUAL(Sequelize.STRING, ['firstName', 'lastName']),
-  get: function() { return `${this.firstName} ${this.lastName}`; },
-},
-```
-
-## args helpers
-
-### defaultArgs
-
-`defaultArgs(Model)` will return an object containing an arg with a key and type matching your models primary key and
-the "where" argument for passing complex query operations described [here](http://docs.sequelizejs.com/en/latest/docs/querying/)
-
-```js
-var Model = sequelize.define('User', {
-
-});
-
-defaultArgs(Model);
-
-/*
-{
-  id: {
-    type: new GraphQLNonNull(GraphQLInt)
-  }
-}
-*/
-
-var Model = sequelize.define('Project', {
-  project_id: {
-    type: Sequelize.UUID
-  }
-});
-
-defaultArgs(Model);
-
-/*
-{
-  project_id: {
-    type: GraphQLString
-  },
-  where: {
-    type: JSONType
-  }
-}
-*/
-```
-
-If you would like to pass "where" as a query variable - you should pass it as a JSON string and declare its type as SequelizeJSON:
-
-```
-/* with GraphiQL */
-// request
-query($where: SequelizeJSON) {
-  user(where: $where) {
-    name
-  }
-}
-
-// query variables
-# JSON doesn't allow single quotes, so you need to use escaped double quotes in your JSON string
-{
-  "where": "{\"name\": {\"like\": \"Henry%\"}}"
-}
-```
-
-### defaultListArgs
-
-`defaultListArgs` will return an object like:
-
-```js
-{
-  limit: {
-    type: GraphQLInt
-  },
-  order: {
-    type: GraphQLString
-  },
-  where: {
-    type: JSONType
-  }
-}
-```
-
-Which when added to args will let the resolver automatically support limit and ordering in args for graphql queries.
-Should be used with fields of type `GraphQLList`.
-
-```js
-import {defaultListArgs} from 'graphql-sequelize'
-
-args: Object.assign(defaultListArgs(), {
-  // ... additional args
-})
-```
-
- `order` expects a valid field name and will sort `ASC` by default. For `DESC` you would prepend `reverse:` to the field name.
-
-
- ```
- /* with GraphiQL */
- // users represents a GraphQLList of type user
-
- query($limit: Int, $order: String, $where: SequelizeJSON) {
-   users(limit: $limit, order: $order, where: $where) {
-     name
-   }
- }
-
- // query variables
- {
-   "order": "name" // OR "reverse:name" for DESC
- }
- ```
+MIT

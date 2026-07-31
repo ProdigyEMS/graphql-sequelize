@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Node ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --audit-level=high
+
+  graphql-17:
+    name: GraphQL 17 compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # graphql-relay currently caps its peer range at GraphQL 16. This job
+      # deliberately uses the package's isolated permissive compatibility lane.
+      - run: npm run test:graphql17
+
+  integration:
+    name: ${{ matrix.dialect }} integration
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dialect: [postgres, mysql, mssql]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: database-tests
+        name: Run ${{ matrix.dialect }} integration tests
+        run: npm run test:docker -- ${{ matrix.dialect }}
+      - name: Verify failure diagnostics
+        if: failure() && steps.database-tests.outcome == 'failure'
+        env:
+          DIALECT: ${{ matrix.dialect }}
+        run: |
+          test -s ".artifacts/test-docker/${DIALECT}/test.log"
+          test -s ".artifacts/test-docker/${DIALECT}/database.log"
+      - name: Upload failure diagnostics
+        if: failure() && steps.database-tests.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: database-failure-${{ matrix.dialect }}-node-22-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .artifacts/test-docker/${{ matrix.dialect }}/
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,9 @@
+.artifacts
+.build
+.git
+coverage
+docs
+examples
+lib
+node_modules
+npm-debug.log

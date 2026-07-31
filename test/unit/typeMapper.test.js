@@ -27,7 +27,7 @@ const {
   JSON,
   JSONB,
   INET,
-  } = Sequelize;
+} = Sequelize;
 
 import {
   GraphQLString,
@@ -197,7 +197,7 @@ describe('typeMapper', () => {
 
   describe('JSON', function () {
     it('should map to JSONType', function () {
-      expect(toGraphQL(new JSON(), Sequelize)).to.equal(JSONType); // eslint-disable-line
+      expect(toGraphQL(new JSON(), Sequelize)).to.equal(JSONType);
     });
   });
 
