@@ -1,19 +1,22 @@
 {
   "name": "@prodigyems/graphql-sequelize",
   "version": "1.0.0",
-  "description": "GraphQL & Relay for MySQL & Postgres via Sequelize",
+  "description": "GraphQL and Relay helpers for Sequelize 6",
   "main": "lib/index.js",
   "types": "types/index.d.ts",
   "type": "commonjs",
   "scripts": {
-    "prepublish": "npm run check && npm run build",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run check && npm run test:package",
     "check": "npm run lint && npm run test:types && npm run test:unit",
     "lint": "eslint src",
-    "build": "rm -rf lib/* && babel src --ignore test --out-dir lib",
+    "build": "node scripts/clean-build.cjs && babel src --ignore test --out-dir lib",
     "test": "npm run test:unit && npm run test:docker",
     "test:watch": "npm run test:unit -- --watch",
     "test:unit": "npm run build:test && mocha \".build/test/unit/**/*.test.js\"",
     "test:types": "tsc --project test/types/tsconfig.json",
+    "test:package": "node scripts/verify-package.cjs",
     "test:graphql17": "sh scripts/test-graphql17.sh",
     "build:docker": "docker-compose build",
     "test:docker": "DIALECT=${DIALECT:=postgres} docker-compose run dev /bin/sh -c \"npm run test:integration\"",
@@ -24,7 +27,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mickhansen/graphql-sequelize.git"
+    "url": "git+https://github.com/ProdigyEMS/graphql-sequelize.git"
   },
   "keywords": [
     "graphql",
@@ -36,9 +39,19 @@
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mickhansen/graphql-sequelize/issues"
+    "url": "https://github.com/ProdigyEMS/graphql-sequelize/issues"
   },
-  "homepage": "https://github.com/mickhansen/graphql-sequelize",
+  "homepage": "https://github.com/ProdigyEMS/graphql-sequelize#readme",
+  "files": [
+    "lib/",
+    "types/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "bluebird": "^3.4.0",
     "invariant": "2.2.1",
