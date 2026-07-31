@@ -5,7 +5,9 @@ import type {
 } from 'graphql';
 import { GraphQLObjectType, GraphQLString } from 'graphql';
 import type { FindOptions, Model, ModelStatic } from 'sequelize';
+import { DataTypes } from 'sequelize';
 import type { ConnectionResult } from '../..';
+import * as generatedTypeMapper from '../../lib/typeMapper.js';
 
 import {
   argsToFindOptions,
@@ -69,6 +71,10 @@ const simplified = simplifyAST(info.fieldNodes, info);
 const mappedType = typeMapper.toGraphQL(
   User.getAttributes().id.type,
   sequelize.constructor
+);
+const generatedMappedType = generatedTypeMapper.toGraphQL(
+  new DataTypes.INTEGER(),
+  DataTypes
 );
 const userType = new GraphQLObjectType({
   name: 'PublicApiTypeUser',
@@ -148,6 +154,7 @@ void modelArgs;
 void fields;
 void simplified;
 void mappedType;
+void generatedMappedType;
 void connection;
 void sameConnection;
 void connectionResolver;

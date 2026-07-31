@@ -1,9 +1,10 @@
-import {Sequelize} from 'sequelize';
-import {transform} from 'lodash';
-const [seqMajVer] = Sequelize.version.split('.');
-let ops;
+import {Op, Sequelize} from 'sequelize';
 
-if (seqMajVer <= 3) {
+const sequelizeStatics = Sequelize as typeof Sequelize & {readonly version: string};
+const [seqMajVer] = sequelizeStatics.version.split('.');
+let ops: Record<string, string | symbol>;
+
+if (Number(seqMajVer) <= 3) {
   ops = {
     eq: '$eq',
     ne: '$ne',
@@ -42,11 +43,11 @@ if (seqMajVer <= 3) {
     raw: '$raw'
   };
 } else {
-  ops = transform(Sequelize.Op, (o, v, k) => {
-    if (typeof v !== 'symbol') {
-      return;
+  ops = {};
+  Object.entries(Op).forEach(([operatorName, operator]) => {
+    if (typeof operator === 'symbol') {
+      ops[operatorName] = operator;
     }
-    o[k] = v;
   });
 }
 
