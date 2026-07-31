@@ -1,23 +1,50 @@
-import sequelizeOps from './sequelizeOps';
+import sequelizeOps from './sequelizeOps.js';
+
+export type WhereKey = string | symbol;
+export type WhereExpression = Record<WhereKey, unknown>;
+
+export interface ReplaceWhereOptions {
+  filterableAttributes?: readonly string[];
+  filterableAttributesFields?: Readonly<Record<string, string>>;
+  allowedModels?: readonly string[];
+  requiredFilters?: readonly string[];
+  validateAttributes?: boolean;
+}
+
+/**
+ * Check whether a value is an expression object that can be traversed safely.
+ *
+ * @param value candidate expression value
+ * @return whether the value is a plain object
+ */
+function isPlainObject(value: unknown): value is WhereExpression {
+  return Object.prototype.toString.call(value) === '[object Object]';
+}
 
 /**
  * Replace a key deeply in an object
- * @param obj
- * @param keyMap
- * @returns {Object}
+ * @param expression expression to translate
+ * @param keyMap GraphQL-friendly keys mapped to Sequelize keys
+ * @param filterableAttributes attributes permitted at the filtering boundary
+ * @param filterableAttributesFields physical field names for permitted attributes
+ * @param allowedModels associated models permitted in nested filters
+ * @return the translated expression
  */
 function replaceKeyDeep(
-  obj,
-  keyMap,
-  filterableAttributes,
-  filterableAttributesFields,
-  allowedModels
-) {
-  const result = Object.getOwnPropertySymbols(obj)
-    .concat(Object.keys(obj))
+  expression: WhereExpression,
+  keyMap: Readonly<Record<string, WhereKey>>,
+  filterableAttributes: readonly string[] | null,
+  filterableAttributesFields: Readonly<Record<string, string>>,
+  allowedModels: readonly string[]
+): WhereExpression {
+  const result: WhereExpression = {};
+
+  return getOwnKeys(expression)
     .reduce((memo, key) => {
       // determine which key we are going to use
-      let targetKey = keyMap[key] ? keyMap[key] : key;
+      const targetKey =
+        typeof key === 'string' && keyMap[key] ? keyMap[key] : key;
+      const value = expression[key];
 
       // On sequelize 4+ operator keys map to Symbols rather than strings (see
       // sequelizeOps). A Symbol is never a model name and never an attribute
@@ -30,7 +57,7 @@ function replaceKeyDeep(
       // A null filterableAttributes means validation was explicitly disabled
       // by the caller (see replaceWhereOperators). An empty array still
       // validates, and rejects everything.
-      const validateField = (target) => {
+      const validateField = (target: string): void => {
         if (
           filterableAttributes !== null &&
           !filterableAttributes.includes(target)
@@ -39,46 +66,44 @@ function replaceKeyDeep(
         }
       };
 
-      if (Array.isArray(obj[key])) {
+      if (Array.isArray(value)) {
         if (isStringKey) {
           validateField(targetKey);
         }
 
         // recurse if an array
-        memo[targetKey] = obj[key].map((val) => {
-          if (Object.prototype.toString.call(val) === '[object Object]') {
+        memo[targetKey] = value.map((entry: unknown) => {
+          if (isPlainObject(entry)) {
             return replaceKeyDeep(
-              val,
+              entry,
               keyMap,
               filterableAttributes,
               filterableAttributesFields,
               allowedModels
             );
           }
-          return val;
+          return entry;
         });
-      } else if (
-        Object.prototype.toString.call(obj[key]) === '[object Object]'
-      ) {
+      } else if (isPlainObject(value)) {
         // On sequelize 4+ operator keys map to Symbols rather than strings
         const isModel =
           isStringKey &&
-          allowedModels.find(
+          allowedModels.some(
             (model) => model.toLowerCase() === targetKey.toLowerCase()
           );
 
         if (isModel) {
-          Object.keys(obj[key]).forEach((column) => {
+          Object.keys(value).forEach((column) => {
             validateField(column);
-            memo[`$${key}.${filterableAttributesFields[column]}$`] =
-              obj[key][column];
+            memo[`$${String(key)}.${filterableAttributesFields[column]}$`] =
+              value[column];
           });
         } else {
           if (isStringKey) {
             validateField(targetKey);
           }
           memo[targetKey] = replaceKeyDeep(
-            obj[key],
+            value,
             keyMap,
             filterableAttributes,
             filterableAttributesFields,
@@ -96,23 +121,21 @@ function replaceKeyDeep(
         }
 
         // assign the new value
-        memo[targetKey] = obj[key];
+        memo[targetKey] = value;
       }
 
       // return the modified object
       return memo;
-    }, {});
-
-  return result;
+    }, result);
 }
 
 /**
  * Return the GraphQL-friendly name for a known Sequelize operator key.
  *
- * @param {string|symbol} key Candidate operator key.
- * @returns {string|undefined} The matching operator name, when known.
+ * @param key candidate operator key
+ * @return the matching operator name, when known
  */
-function getOperatorName(key) {
+function getOperatorName(key: WhereKey): string | undefined {
   return Object.keys(sequelizeOps).find(
     (name) => key === name || key === sequelizeOps[name]
   );
@@ -121,27 +144,28 @@ function getOperatorName(key) {
 /**
  * Return every own string and symbol key on an expression object.
  *
- * @param {Object} expression Expression object to inspect.
- * @returns {Array<string|symbol>} The object's own keys.
+ * @param expression expression object to inspect
+ * @return the object's own keys
  */
-function getOwnKeys(expression) {
-  return Object.getOwnPropertySymbols(expression).concat(
-    Object.keys(expression)
-  );
+function getOwnKeys(expression: WhereExpression): WhereKey[] {
+  return [
+    ...Object.getOwnPropertySymbols(expression),
+    ...Object.keys(expression)
+  ];
 }
 
 /**
  * Determine whether a required field's value is a positive predicate.
  *
- * @param {*} value Value supplied for the required field.
- * @returns {boolean} Whether the value guarantees the required filter.
+ * @param value value supplied for the required field
+ * @return whether the value guarantees the required filter
  */
-function requiredPredicateGuaranteesFilter(value) {
+function requiredPredicateGuaranteesFilter(value: unknown): boolean {
   if (Array.isArray(value)) {
     return true;
   }
 
-  if (Object.prototype.toString.call(value) === '[object Object]') {
+  if (isPlainObject(value)) {
     return expressionGuaranteesFilter(value, null, true);
   }
 
@@ -153,16 +177,16 @@ function requiredPredicateGuaranteesFilter(value) {
  *
  * Object-form OR values treat each entry as its own branch, matching Sequelize.
  *
- * @param {*} value Branches beneath the OR operator.
- * @param {string|null} requiredFilter Required attribute name.
- * @param {boolean} fieldExpression Whether this is a field operator expression.
- * @returns {boolean} Whether every branch guarantees the required filter.
+ * @param value branches beneath the OR operator
+ * @param requiredFilter required attribute name
+ * @param fieldExpression whether this is a field operator expression
+ * @return whether every branch guarantees the required filter
  */
 function orExpressionGuaranteesFilter(
-  value,
-  requiredFilter,
-  fieldExpression
-) {
+  value: unknown,
+  requiredFilter: string | null,
+  fieldExpression: boolean
+): boolean {
   if (Array.isArray(value)) {
     return (
       value.length > 0 &&
@@ -176,7 +200,7 @@ function orExpressionGuaranteesFilter(
     );
   }
 
-  if (Object.prototype.toString.call(value) !== '[object Object]') {
+  if (!isPlainObject(value)) {
     return false;
   }
 
@@ -198,18 +222,18 @@ function orExpressionGuaranteesFilter(
 /**
  * Determine whether one expression entry guarantees a required filter.
  *
- * @param {string|symbol} key Expression key.
- * @param {*} value Value stored beneath the key.
- * @param {string|null} requiredFilter Required attribute name.
- * @param {boolean} fieldExpression Whether this is a field operator expression.
- * @returns {boolean} Whether this conjunct guarantees the required filter.
+ * @param key expression key
+ * @param value value stored beneath the key
+ * @param requiredFilter required attribute name
+ * @param fieldExpression whether this is a field operator expression
+ * @return whether this conjunct guarantees the required filter
  */
 function expressionEntryGuaranteesFilter(
-  key,
-  value,
-  requiredFilter,
-  fieldExpression
-) {
+  key: WhereKey,
+  value: unknown,
+  requiredFilter: string | null,
+  fieldExpression: boolean
+): boolean {
   const operatorName = getOperatorName(key);
 
   if (operatorName === 'not') {
@@ -233,7 +257,8 @@ function expressionEntryGuaranteesFilter(
   }
 
   if (fieldExpression) {
-    return ['eq', 'in', 'is'].includes(operatorName);
+    return operatorName !== undefined &&
+      ['eq', 'in', 'is'].includes(operatorName);
   }
 
   if (operatorName) {
@@ -254,16 +279,16 @@ function expressionEntryGuaranteesFilter(
  * establish the guarantee. Every branch of an OR must establish it, while a
  * predicate beneath NOT can never do so.
  *
- * @param {*} expression Where or field expression to inspect.
- * @param {string|null} requiredFilter Required attribute name.
- * @param {boolean} fieldExpression Whether this is a field operator expression.
- * @returns {boolean} Whether every result is constrained by the filter.
+ * @param expression where or field expression to inspect
+ * @param requiredFilter required attribute name
+ * @param fieldExpression whether this is a field operator expression
+ * @return whether every result is constrained by the filter
  */
 function expressionGuaranteesFilter(
-  expression,
-  requiredFilter,
-  fieldExpression
-) {
+  expression: unknown,
+  requiredFilter: string | null,
+  fieldExpression: boolean
+): boolean {
   if (Array.isArray(expression)) {
     return expression.some((entry) =>
       expressionGuaranteesFilter(
@@ -274,7 +299,7 @@ function expressionGuaranteesFilter(
     );
   }
 
-  if (Object.prototype.toString.call(expression) !== '[object Object]') {
+  if (!isPlainObject(expression)) {
     return false;
   }
 
@@ -292,12 +317,33 @@ function expressionGuaranteesFilter(
 /**
  * Determine whether a where expression guarantees a required positive filter.
  *
- * @param {*} where Where expression to inspect.
- * @param {string} requiredFilter Required attribute name.
- * @returns {boolean} Whether every result is constrained by the filter.
+ * @param where where expression to inspect
+ * @param requiredFilter required attribute name
+ * @return whether every result is constrained by the filter
  */
-function whereGuaranteesFilter(where, requiredFilter) {
+function whereGuaranteesFilter(
+  where: WhereExpression,
+  requiredFilter: string
+): boolean {
   return expressionGuaranteesFilter(where, requiredFilter, false);
+}
+
+/**
+ * Validate required-filter configuration supplied across typed and JavaScript callers.
+ *
+ * Array.from intentionally materializes sparse entries so holes fail validation
+ * exactly like explicit undefined values.
+ *
+ * @param value candidate required-filter list
+ * @return whether every entry is a non-empty string
+ */
+function isRequiredFilterList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) &&
+    Array.from(value).every(
+      (requiredFilter: unknown) =>
+        typeof requiredFilter === 'string' &&
+        requiredFilter.trim().length > 0
+    );
 }
 
 /**
@@ -313,26 +359,19 @@ function whereGuaranteesFilter(where, requiredFilter) {
  *
  * @param where arguments object in GraphQL Safe format meaning no leading "$" chars.
  * @param options validation context; see above.
- * @returns {Object}
+ * @return Sequelize-compatible where expression
  */
 export function replaceWhereOperators(
-  where,
+  where: WhereExpression,
   {
     filterableAttributes = [],
     filterableAttributesFields = {},
     allowedModels = [],
     requiredFilters = [],
     validateAttributes = true
-  } = {}
-) {
-  if (
-    !Array.isArray(requiredFilters) ||
-    Array.from(requiredFilters).some(
-      (requiredFilter) =>
-        typeof requiredFilter !== 'string' ||
-        requiredFilter.trim().length === 0
-    )
-  ) {
+  }: ReplaceWhereOptions = {}
+): WhereExpression {
+  if (!isRequiredFilterList(requiredFilters)) {
     throw new Error('requiredFilters must contain non-empty strings.');
   }
 

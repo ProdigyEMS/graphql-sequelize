@@ -325,6 +325,18 @@ describe('authorization: filterable attributes', function () {
   });
 
   describe('argsToFindOptions', function () {
+    it('preserves null as the public attribute-validation opt-out', function () {
+      const findOptions = argsToFindOptions(
+        { where: { secret: 1 } },
+        null,
+        {},
+        [],
+        []
+      );
+
+      expect(findOptions.where).to.deep.equal({ secret: 1 });
+    });
+
     it('drops a where key that is not filterable', function () {
       // Silently dropping rather than throwing is the existing contract. The
       // risk to guard against is the opposite -- the key being passed through
