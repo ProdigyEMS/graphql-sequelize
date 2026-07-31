@@ -128,11 +128,27 @@ export interface SimplifiedAST {
   readonly $parent?: SimplifiedAST;
 }
 
+export interface SimplifiedASTCollection {
+  fields?: Record<string, SimplifiedAST>;
+}
+
+export function simplifyAST(
+  ast: ReadonlyArray<ASTNode>,
+  info?: Partial<GraphQLResolveInfo>,
+  parent?: SimplifiedAST
+): SimplifiedASTCollection;
+
+export function simplifyAST(
+  ast: ASTNode,
+  info?: Partial<GraphQLResolveInfo>,
+  parent?: SimplifiedAST
+): SimplifiedAST;
+
 export function simplifyAST(
   ast: ASTNode | ReadonlyArray<ASTNode>,
   info?: Partial<GraphQLResolveInfo>,
   parent?: SimplifiedAST
-): SimplifiedAST;
+): SimplifiedAST | SimplifiedASTCollection;
 
 export type ConnectionWhere = Record<string, unknown>;
 

@@ -9,11 +9,20 @@ import type {
 import { GraphQLObjectType, GraphQLString } from 'graphql';
 import type { FindOptions, Model, ModelStatic } from 'sequelize';
 import { DataTypes } from 'sequelize';
-import type { ConnectionResult } from '../..';
+import type {
+  ConnectionResult,
+  SimplifiedAST as RootSimplifiedAST,
+  SimplifiedASTCollection as RootSimplifiedASTCollection
+} from '../..';
 import generatedAttributeFields from '../../lib/attributeFields.js';
 import type { AttributeFieldsOptions as GeneratedAttributeFieldsOptions } from '../../lib/attributeFields.js';
 import generatedDefaultArgs from '../../lib/defaultArgs.js';
 import generatedDefaultListArgs from '../../lib/defaultListArgs.js';
+import generatedSimplifyAST from '../../lib/simplifyAST.js';
+import type {
+  SimplifiedAST as GeneratedSimplifiedAST,
+  SimplifiedASTCollection as GeneratedSimplifiedASTCollection
+} from '../../lib/simplifyAST.js';
 import * as generatedTypeMapper from '../../lib/typeMapper.js';
 
 import {
@@ -95,7 +104,37 @@ const generatedModelArgs: GraphQLFieldConfigArgumentMap =
   generatedDefaultArgs(User);
 const generatedListArgs: GraphQLFieldConfigArgumentMap =
   generatedDefaultListArgs();
-const simplified = simplifyAST(info.fieldNodes, info);
+const generatedSingleSimplified: GeneratedSimplifiedAST = generatedSimplifyAST(
+  info.fieldNodes[0],
+  info
+);
+const generatedCollection: GeneratedSimplifiedASTCollection =
+  generatedSimplifyAST(info.fieldNodes, info);
+const generatedCollectionFields: Record<string, GeneratedSimplifiedAST> | undefined =
+  generatedCollection.fields;
+// @ts-expect-error AST collections do not expose node arguments.
+void generatedCollection.args;
+const generatedEmptyCollection: GeneratedSimplifiedASTCollection =
+  generatedSimplifyAST([], info);
+const generatedEmptyCollectionFields: Record<string, GeneratedSimplifiedAST> | undefined =
+  generatedEmptyCollection.fields;
+// @ts-expect-error Empty AST collections do not expose node arguments.
+void generatedEmptyCollection.args;
+const rootSingleSimplified: RootSimplifiedAST = simplifyAST(
+  info.fieldNodes[0],
+  info
+);
+const rootCollection: RootSimplifiedASTCollection =
+  simplifyAST(info.fieldNodes, info);
+const rootCollectionFields: Record<string, RootSimplifiedAST> | undefined =
+  rootCollection.fields;
+// @ts-expect-error Root AST collections do not expose node arguments.
+void rootCollection.args;
+const rootEmptyCollection: RootSimplifiedASTCollection = simplifyAST([], info);
+const rootEmptyCollectionFields: Record<string, RootSimplifiedAST> | undefined =
+  rootEmptyCollection.fields;
+// @ts-expect-error Empty root AST collections do not expose node arguments.
+void rootEmptyCollection.args;
 const mappedType = typeMapper.toGraphQL(
   User.getAttributes().id.type,
   sequelize.constructor
@@ -184,7 +223,12 @@ void generatedFields;
 void generatedRecordFields;
 void generatedModelArgs;
 void generatedListArgs;
-void simplified;
+void generatedSingleSimplified;
+void generatedCollectionFields;
+void generatedEmptyCollectionFields;
+void rootSingleSimplified;
+void rootCollectionFields;
+void rootEmptyCollectionFields;
 void mappedType;
 void generatedMappedType;
 void connection;
