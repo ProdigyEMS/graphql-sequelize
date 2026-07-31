@@ -6,6 +6,7 @@ services:
       - mysql
     volumes:
       - .:/src/graphql-sequelize
+      - /src/graphql-sequelize/node_modules
     environment:
       DIALECT: "${DIALECT:-postgres}"
 
@@ -86,6 +87,7 @@ services:
       - postgres
     volumes:
       - .:/src/graphql-sequelize
+      - /src/graphql-sequelize/node_modules
     environment:
       DIALECT: postgres
       DB_DATABASE: graphql_sequelize_test

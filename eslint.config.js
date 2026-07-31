@@ -20,7 +20,7 @@ const globals = require('globals');
  */
 module.exports = [
   {
-    files: ['**/*.js'],
+    files: ['**/*.js', '**/*.cjs'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -155,13 +155,30 @@ module.exports = [
     },
   },
   {
-    files: ['test/**/*.js'],
+    files: ['test/**/*.js', 'test/**/*.cjs'],
     languageOptions: {
       globals: {
         ...globals.mocha,
         expect: 'readonly',
         assert: 'readonly',
       },
+    },
+  },
+  {
+    files: ['scripts/**/*.cjs', 'test/**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+    },
+  },
+  {
+    files: ['test/benchmark/seed.js'],
+    languageOptions: {
+      parserOptions: {
+        ecmaFeatures: {
+          globalReturn: true,
+        },
+      },
+      sourceType: 'commonjs',
     },
   },
 ];

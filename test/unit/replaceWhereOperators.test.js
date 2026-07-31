@@ -114,7 +114,7 @@ describe('replaceWhereOperators', () => {
           const value = target[prop];
           return typeof value === 'object' ? proxify(value) : value;
         },
-        set(target, prop, value) {
+        set() {
           expect.fail('It tryes to change argument');
         }
       });
@@ -129,7 +129,7 @@ describe('replaceWhereOperators', () => {
       after = {
         prop1: {[Sequelize.Op.gt]: 12},
         prop2: {[Sequelize.Op.or]: [{[Sequelize.Op.eq]: 3}, {[Sequelize.Op.eq]: 4}]}
-      }
+      };
     }
     expect(replaceWhereOperators(proxify(before), { filterableAttributes: ['prop1', 'prop2'] })).to.deep.equal(after);
   });

@@ -9,7 +9,7 @@ import {
   GraphQLString
 } from 'graphql';
 import simplifyAST from '../../src/simplifyAST';
-var parser = require('graphql/language/parser').parse // eslint-disable-line
+var parser = require('graphql/language/parser').parse
   , parse = function (query) {
     return parser(query).definitions[0];
   };

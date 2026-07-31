@@ -648,8 +648,7 @@ describe('resolver', function () {
     var users = this.users
       , schema
       , userType
-      , taskType
-      , spy = sinon.spy();
+      , taskType;
 
     taskType = new GraphQLObjectType({
       name: 'Task',
@@ -737,8 +736,7 @@ describe('resolver', function () {
     var users = this.users
       , schema
       , userType
-      , taskType
-      , spy = sinon.spy();
+      , taskType;
 
     taskType = new GraphQLObjectType({
       name: 'Task',
@@ -971,8 +969,7 @@ describe('resolver', function () {
   });
 
   it('should resolve a array result with a single limited hasMany association with a nested belongsTo relation', () => {
-    var users = this.users
-      , sqlSpy = sinon.spy();
+    var users = this.users;
 
     return graphql({
       schema,
@@ -1002,8 +999,7 @@ describe('resolver', function () {
   });
 
   it('should resolve a array result with a single hasMany association with a nested belongsTo relation', () => {
-    var users = this.users
-      , sqlSpy = sinon.spy();
+    var users = this.users;
 
     return graphql({
       schema,
@@ -1034,8 +1030,7 @@ describe('resolver', function () {
 
   it('should resolve a array result with a single hasMany association' +
      'with a nested belongsTo relation with a nested hasMany relation', () => {
-    var users = this.users
-      , sqlSpy = sinon.spy();
+    var users = this.users;
 
     return graphql({
       schema,

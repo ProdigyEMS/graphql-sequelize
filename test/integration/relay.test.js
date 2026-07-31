@@ -5,7 +5,6 @@ import { sequelize, Promise, beforeRemoveAllTables, markFilterable } from '../su
 import { expect } from 'chai';
 import resolver from '../../src/resolver';
 import Sequelize from 'sequelize';
-import sinon from'sinon';
 
 import {
   GraphQLString,
@@ -484,10 +483,10 @@ describe('relay', function () {
         }
       `
     })
-    .then((result) => {
-      return graphql({
-        schema,
-        source: `
+      .then((result) => {
+        return graphql({
+          schema,
+          source: `
           {
             user(id: ${user.id}) {
               name
@@ -501,10 +500,10 @@ describe('relay', function () {
             }
           }
         `
+        });
+      }).then((result) => {
+        expect(result.data.user.tasks.edges[0].node.name).to.equal(user.taskItems[1].name);
       });
-    }).then((result) => {
-      expect(result.data.user.tasks.edges[0].node.name).to.equal(user.taskItems[1].name);
-    });
   });
 
   it('should resolve a plain result with a single connection', () => {
@@ -582,8 +581,6 @@ describe('relay', function () {
   });
 
   it('should resolve nested connections', () => {
-    var sqlSpy = sinon.spy();
-
     return graphql({
       schema,
       source: `

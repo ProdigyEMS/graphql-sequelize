@@ -1309,8 +1309,6 @@ describe('relay', function () {
 
 
     it('should support prefetching two nested connections', async () => {
-      let sqlSpy = sinon.spy();
-
       let result = await graphql({
         schema: this.schema,
         source: `
@@ -1365,8 +1363,6 @@ describe('relay', function () {
     });
 
     it('should support paging a nested connection', async () => {
-      let sqlSpy = sinon.spy();
-
       let result = await graphql({
         schema: this.schema,
         source: `
@@ -1453,8 +1449,6 @@ describe('relay', function () {
     });
 
     it('should support edgeFields', async () => {
-      let sqlSpy = sinon.spy();
-
       let result = await graphql({
         schema: this.schema,
         source: `
