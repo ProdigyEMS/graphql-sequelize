@@ -3,6 +3,7 @@
 import { expect } from 'chai';
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
+import { createSequelize } from '../support/helper';
 
 const repositoryFile = (filePath) =>
   readFileSync(path.resolve(filePath), 'utf8');
@@ -85,6 +86,48 @@ describe('continuous integration configuration', function () {
       'GRAPHQL_SEQUELIZE_TEST_DOCKER_ARTIFACT_ROOT'
     );
     expect(runner).to.include('Artifact root must be an absolute non-root path.');
+  });
+
+  it('uses the provisioned database credentials when CI is set', function () {
+    const originalEnvironment = { ...process.env };
+
+    try {
+      Object.assign(process.env, {
+        CI: 'true',
+        DIALECT: 'postgres',
+        POSTGRES_PORT_5432_TCP_ADDR: '127.0.0.1',
+        POSTGRES_PORT_5432_TCP_PORT: '54321',
+        POSTGRES_ENV_POSTGRES_USER: 'graphql_sequelize_test',
+        POSTGRES_ENV_POSTGRES_PASSWORD: 'graphql_sequelize_test',
+        POSTGRES_ENV_POSTGRES_DATABASE: 'graphql_sequelize_test'
+      });
+
+      const postgres = createSequelize();
+
+      expect(postgres.config.username).to.equal('graphql_sequelize_test');
+      expect(postgres.config.password).to.equal('graphql_sequelize_test');
+
+      Object.assign(process.env, {
+        DIALECT: 'mysql',
+        MYSQL_PORT_3306_TCP_ADDR: '127.0.0.1',
+        MYSQL_PORT_3306_TCP_PORT: '54322',
+        MYSQL_ENV_MYSQL_USER: 'test',
+        MYSQL_ENV_MYSQL_PASSWORD: 'test',
+        MYSQL_ENV_MYSQL_DATABASE: 'test'
+      });
+
+      const mysql = createSequelize();
+
+      expect(mysql.config.username).to.equal('test');
+      expect(mysql.config.password).to.equal('test');
+    } finally {
+      Object.keys(process.env).forEach((name) => {
+        if (!(name in originalEnvironment)) {
+          delete process.env[name];
+        }
+      });
+      Object.assign(process.env, originalEnvironment);
+    }
   });
 
 });

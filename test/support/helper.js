@@ -40,16 +40,6 @@ export function createSequelize(options = {}) {
       user: env.MSSQL_ENV_MSSQL_USER,
       password: env.MSSQL_ENV_MSSQL_PASSWORD,
       database: env.MSSQL_ENV_MSSQL_DATABASE
-    },
-    dialect === 'postgres' && env.CI && {
-      user: 'postgres',
-      password: '',
-      database: 'test'
-    },
-    dialect === 'mysql' && env.CI && {
-      user: 'travis',
-      password: '',
-      database: 'test'
     }
   );
 
