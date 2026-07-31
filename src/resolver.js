@@ -2,6 +2,7 @@ import { GraphQLList, GraphQLNonNull } from 'graphql';
 import _ from 'lodash';
 import argsToFindOptions from './argsToFindOptions';
 import { isConnection, handleConnection, nodeType } from './relay';
+import normalizeVariableValues from './normalizeVariableValues';
 import assert from 'assert';
 
 function whereQueryVarsToValues(o, vals) {
@@ -107,14 +108,12 @@ function resolvesToConnection(graphqlType, associationName) {
 }
 
 /**
- * BREAKING (1.0.0): `models` and `requiredFilters` moved from positional
- * parameters 2 and 3 into `options`, restoring the upstream
- * resolver(target, options) shape.
+ * `models` and `requiredFilters` belong in the options object, preserving the
+ * upstream resolver(target, options) shape.
  *
- * The positional form was a footgun: a legacy two-argument call such as
- * resolver(User, { before }) silently bound its options object to `models`
- * and ran with no options at all, failing at runtime rather than at the
- * call site.
+ * Positional arguments are rejected explicitly. JavaScript otherwise ignores
+ * arguments beyond this function's signature, which can silently disable
+ * required filters and hooks during a migration.
  *
  * Both values default to empty and fail closed -- no models means no
  * cross-model filterable attributes, no required filters means none are
@@ -123,6 +122,11 @@ function resolvesToConnection(graphqlType, associationName) {
  * sequelize find options built further down.
  */
 function resolverFactory(targetMaybeThunk, rawOptions = {}) {
+  assert(
+    arguments.length <= 2,
+    'resolver() accepts at most two arguments. Use resolver(target, { models, requiredFilters, ...options }).'
+  );
+
   const { models = {}, requiredFilters = [], ...options } = rawOptions;
   assert(
     typeof targetMaybeThunk === 'function' ||
@@ -290,8 +294,10 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
     return Promise.resolve(options.before(findOptions, args, context, info))
       .then(async function(findOptions) {
         if (args.where && !_.isEmpty(info.variableValues)) {
-          whereQueryVarsToValues(args.where, info.variableValues);
-          whereQueryVarsToValues(findOptions.where, info.variableValues);
+          const variableValues = normalizeVariableValues(info.variableValues);
+
+          whereQueryVarsToValues(args.where, variableValues);
+          whereQueryVarsToValues(findOptions.where, variableValues);
         }
 
         if (list && !findOptions.order) {
@@ -312,9 +318,9 @@ function resolverFactory(targetMaybeThunk, rawOptions = {}) {
           // asked for counts, since the eager-loaded rows arrive in whatever
           // order the join produced.
           const hasUnappliedConstraints = Boolean(
-            findOptions.limit ||
+            findOptions.limit !== undefined ||
               findOptions.where ||
-              findOptions.offset ||
+              findOptions.offset !== undefined ||
               args.order ||
               args.orderBy
           );

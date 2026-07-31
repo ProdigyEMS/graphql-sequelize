@@ -1,3 +1,5 @@
+import normalizeVariableValues from './normalizeVariableValues';
+
 function deepMerge(a, b) {
   Object.keys(b).forEach(function (key) {
     if (['fields', 'args'].indexOf(key) !== -1) return;
@@ -52,7 +54,7 @@ function simplifyValue(value, info) {
     return simplifyObjectValue(value);
   }
   if (value.name && info.variableValues) {
-    return info.variableValues[value.name.value];
+    return normalizeVariableValues(info.variableValues)[value.name.value];
   }
 }
 
@@ -102,10 +104,16 @@ module.exports = function simplifyAST(ast, info, parent) {
       simpleAST.fields[key].key = name;
     }
 
-    simpleAST.fields[key].args = selection.arguments.reduce(function (args, arg) {
-      args[arg.name.value] = simplifyValue(arg.value, info);
-      return args;
-    }, {});
+    // GraphQL 17 omits `arguments` for fields without arguments, while older
+    // releases supplied an empty array.
+    simpleAST.fields[key].args = (selection.arguments || []).reduce(
+      function (args, arg) {
+        args[arg.name.value] = simplifyValue(arg.value, info);
+
+        return args;
+      },
+      {}
+    );
 
     if (parent) {
       Object.defineProperty(simpleAST.fields[key], '$parent', { value: parent, enumerable: false });

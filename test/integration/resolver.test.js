@@ -1209,6 +1209,65 @@ describe('resolver', function () {
     });
   });
 
+  it('supports models and required filters in the preferred options object', async () => {
+    const before = sinon.spy((options) => options);
+    const after = sinon.spy((result) => result);
+    const resolveUsers = resolver(User, {
+      models: {
+        [User.name]: User
+      },
+      requiredFilters: ['id'],
+      before,
+      after
+    });
+    const info = {
+      returnType: new GraphQLList(userType),
+      variableValues: {}
+    };
+    let missingFilterError;
+
+    try {
+      await resolveUsers(null, {}, {}, info);
+    } catch (error) {
+      missingFilterError = error;
+    }
+
+    expect(missingFilterError).to.be.instanceOf(Error);
+    expect(missingFilterError.message).to.match(/Filter id is missing/);
+
+    const result = await resolveUsers(
+      null,
+      { where: { id: this.userA.id } },
+      {},
+      info
+    );
+
+    expect(result).to.have.length(1);
+    expect(result[0].id).to.equal(this.userA.id);
+    expect(before.calledOnce).to.equal(true);
+    expect(after.calledOnce).to.equal(true);
+  });
+
+  it('rejects positional resolver options with migration guidance', () => {
+    const before = sinon.spy((options) => options);
+    const after = sinon.spy((result) => result);
+    const models = {
+      [User.name]: User
+    };
+    const message =
+      'resolver() accepts at most two arguments. Use resolver(target, { models, requiredFilters, ...options }).';
+
+    expect(() => resolver(User, models, ['id'])).to.throw(message);
+    expect(() =>
+      resolver(User, models, ['id'], {
+        before,
+        after
+      })
+    ).to.throw(message);
+    expect(before.called).to.equal(false);
+    expect(after.called).to.equal(false);
+  });
+
   it('should resolve args from array to before', () => {
     var user = this.userB;
 

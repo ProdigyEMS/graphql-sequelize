@@ -3,15 +3,18 @@
   "version": "1.0.0",
   "description": "GraphQL & Relay for MySQL & Postgres via Sequelize",
   "main": "lib/index.js",
+  "types": "types/index.d.ts",
   "type": "commonjs",
   "scripts": {
     "prepublish": "npm run check && npm run build",
-    "check": "npm run lint && npm run test:unit",
+    "check": "npm run lint && npm run test:types && npm run test:unit",
     "lint": "eslint src",
     "build": "rm -rf lib/* && babel src --ignore test --out-dir lib",
     "test": "npm run test:unit && npm run test:docker",
     "test:watch": "npm run test:unit -- --watch",
     "test:unit": "npm run build:test && mocha \".build/test/unit/**/*.test.js\"",
+    "test:types": "tsc --project test/types/tsconfig.json",
+    "test:graphql17": "sh scripts/test-graphql17.sh",
     "build:docker": "docker-compose build",
     "test:docker": "DIALECT=${DIALECT:=postgres} docker-compose run dev /bin/sh -c \"npm run test:integration\"",
     "test:integration": "npm run build:test && node scripts/run-integration.cjs",
@@ -43,8 +46,8 @@
   },
   "peerDependencies": {
     "graphql": "^0.5.0 || ^0.6.0 || ^0.7.0 || ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14 || ^15 || ^16",
-    "graphql-relay": "^0.4.2 || ^0.5.0 || ^0.7.0 || ^0.8.0 || ^0.9.0 || ^0.10.0",
-    "sequelize": ">=3.0.0"
+    "graphql-relay": "^0.4.2 || ^0.5.0 || ^0.6.0 || ^0.7.0 || ^0.8.0 || ^0.9.0 || ^0.10.0",
+    "sequelize": "^6.0.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.3",
@@ -58,7 +61,7 @@
     "eslint": "^9.37.0",
     "globals": "^15.15.0",
     "graphql": "^16.6.0",
-    "graphql-relay": "^0.10.0",
+    "graphql-relay": "^0.10.2",
     "mocha": "^11.7.4",
     "mysql2": "^3.15.4",
     "pg": "^8.16.3",
@@ -67,7 +70,8 @@
     "sinon": "^19.0.5",
     "sinon-chai": "^3.7.0",
     "sqlite3": "^6.0.1",
-    "tedious": "^20.0.0"
+    "tedious": "^20.0.0",
+    "typescript": "^5.9.3"
   },
   "directories": {
     "doc": "docs",

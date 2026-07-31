@@ -425,6 +425,26 @@ describe('regressions', function () {
       );
     });
 
+    it('returns no children when a preloaded association has limit zero', async function () {
+      const parent = await loadParentWithReversedChildren(
+        this.User,
+        this.Task,
+        this.User.Tasks,
+        this.user.id
+      );
+
+      expect(parent[this.User.Tasks.as]).to.have.length.above(0);
+
+      const result = await resolver(this.User.Tasks)(
+        parent,
+        { limit: 0 },
+        {},
+        resolveInfo(new GraphQLList(this.taskType))
+      );
+
+      expect(result).to.deep.equal([]);
+    });
+
     it('does not reorder the parent instance in place', async function () {
       // The array belongs to the parent, so sorting it in place would be
       // visible to anything else holding that instance.
