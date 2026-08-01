@@ -1,7 +1,7 @@
 'use strict';
 
 import { expect } from 'chai';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 
 const packageJson = JSON.parse(
@@ -23,6 +23,16 @@ describe('package metadata', function () {
 
   it('packs only generated declarations', function () {
     expect(packageJson.files).not.to.include('types/');
+    expect(existsSync(path.resolve('types'))).to.equal(false);
+  });
+
+  it('does not retain the obsolete Babel toolchain', function () {
+    expect(existsSync(path.resolve('babel.config.json'))).to.equal(false);
+    expect(
+      Object.keys(packageJson.devDependencies).filter((dependency) =>
+        dependency.startsWith('@babel/')
+      )
+    ).to.deep.equal([]);
   });
 
   it('builds declarations before checking the public type contract', function () {

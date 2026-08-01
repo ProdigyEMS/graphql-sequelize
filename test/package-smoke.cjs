@@ -110,6 +110,10 @@ try {
     ),
     'Tarball contains source, test, example, tooling, or configuration files.'
   );
+  assert(
+    !packedFiles.some((filePath) => /^types(?:\/|$)/.test(filePath)),
+    'Tarball contains the obsolete types/ directory.'
+  );
 
   writeFileSync(
     path.join(consumerDirectory, 'package.json'),
@@ -134,6 +138,21 @@ try {
     'graphql-sequelize'
   );
   const consumerScriptPath = path.join(consumerDirectory, 'package-smoke.mjs');
+
+  assert(
+    !existsSync(path.join(installedPackage, 'types')),
+    'Installed package contains the obsolete types/ directory.'
+  );
+
+  for (const modulePath of generatedModules) {
+    for (const extension of ['.js', '.js.map', '.d.ts', '.d.ts.map']) {
+      assert(
+        existsSync(path.join(installedPackage, 'lib', `${modulePath}${extension}`)),
+        `Installed package omits lib/${modulePath}${extension}.`
+      );
+    }
+  }
+
   writeFileSync(
     consumerScriptPath,
     [

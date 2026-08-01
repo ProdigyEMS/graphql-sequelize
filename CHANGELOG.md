@@ -2,6 +2,38 @@
 
 All notable changes to the ProdigyEMS fork are documented here.
 
+## [2.0.0] - Unreleased
+
+### Breaking
+
+- Publish native ESM only for Node 22 and newer. CommonJS `require()` is no
+  longer supported.
+- Expose only the package root. Deep imports from `lib/` are no longer
+  supported.
+
+### Changed
+
+- Rewrite the implementation in strict TypeScript and generate JavaScript,
+  source maps, declarations, and declaration maps together under `lib/`.
+- Replace the handwritten `types/index.d.ts` declarations with declarations
+  generated from the implementation.
+- Remove Babel and its configuration from the build and development toolchain.
+
+### Compatibility
+
+- Preserve the version 1.0 `resolver(target, options)` API, including the
+  `models`, `requiredFilters`, `list`, `handleConnection`, `operation`,
+  `contextToOptions`, `before`, and `after` options.
+- Preserve all version 1.0 root export names through native ESM named exports.
+
+### Security
+
+- On 2026-08-01, `npm audit --omit=dev` reported zero vulnerabilities. The
+  full development graph reported five vulnerable dependency instances: three
+  low and two moderate. They arise from `diff` through Mocha/Sinon tooling and
+  `uuid` through Sequelize's development dependency path. It reported zero
+  high or critical findings.
+
 ## [1.0.0] - 2026-07-31
 
 ### Breaking
@@ -46,3 +78,4 @@ All notable changes to the ProdigyEMS fork are documented here.
   findings.
 
 [1.0.0]: https://github.com/ProdigyEMS/graphql-sequelize/compare/v9.5.1...prodigy-v1.0.0
+[2.0.0]: https://github.com/ProdigyEMS/graphql-sequelize/compare/prodigy-v1.0.0...HEAD

@@ -58,6 +58,50 @@ function parsePackResult(output) {
   return packResults[0];
 }
 
+/**
+ * Verify that npm packed only complete TypeScript compiler output below lib.
+ *
+ * @param {string[]} packedFiles paths reported by npm pack
+ * @return {void}
+ */
+function verifyGeneratedArtifactShape(packedFiles) {
+  if (packedFiles.some((filePath) => /^types(?:\/|$)/.test(filePath))) {
+    throw new Error('Tarball must not contain the obsolete types/ directory.');
+  }
+
+  const generatedJavaScript = packedFiles.filter((filePath) =>
+    /^lib\/.+\.js$/.test(filePath)
+  );
+
+  if (generatedJavaScript.length === 0) {
+    throw new Error('Tarball does not contain generated JavaScript under lib/.');
+  }
+
+  const expectedGeneratedFiles = generatedJavaScript.flatMap((filePath) => {
+    const modulePath = filePath.slice(0, -'.js'.length);
+
+    return [
+      `${modulePath}.d.ts`,
+      `${modulePath}.d.ts.map`,
+      `${modulePath}.js`,
+      `${modulePath}.js.map`
+    ];
+  });
+  const actualGeneratedFiles = packedFiles.filter((filePath) =>
+    filePath.startsWith('lib/')
+  );
+
+  if (
+    JSON.stringify(actualGeneratedFiles.sort()) !==
+    JSON.stringify(expectedGeneratedFiles.sort())
+  ) {
+    throw new Error(
+      'Tarball must contain one .js, .js.map, .d.ts, and .d.ts.map quartet ' +
+        'for every generated module under lib/.'
+    );
+  }
+}
+
 try {
   // A publish check must prove the lifecycle creates the distributable itself.
   rmSync(buildDirectory, { force: true, recursive: true });
@@ -70,11 +114,14 @@ try {
   ]);
   const packResult = parsePackResult(output);
   const tarballPath = path.join(packDirectory, packResult.filename);
+  const packedFiles = packResult.files.map(({ path: filePath }) => filePath);
+
+  verifyGeneratedArtifactShape(packedFiles);
 
   run(process.execPath, [
     path.join(repositoryRoot, 'test/package-smoke.cjs'),
     tarballPath,
-    JSON.stringify(packResult.files.map(({ path: filePath }) => filePath))
+    JSON.stringify(packedFiles)
   ]);
 
   process.stdout.write(
