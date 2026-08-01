@@ -39,9 +39,24 @@ const expectedFiles = [
     `lib/${modulePath}.js`,
     `lib/${modulePath}.js.map`
   ]),
-  'package.json',
-  'types/index.d.ts'
+  'package.json'
 ].sort();
+const expectedExports = [
+  'DateType',
+  'JSONType',
+  'argsToFindOptions',
+  'attributeFields',
+  'createConnection',
+  'createConnectionResolver',
+  'createNodeInterface',
+  'defaultArgs',
+  'defaultListArgs',
+  'relay',
+  'resolver',
+  'sequelizeConnection',
+  'simplifyAST',
+  'typeMapper'
+];
 const tarballPath = process.argv[2];
 const packedFiles = JSON.parse(process.argv[3] || '[]').sort();
 const consumerDirectory = mkdtempSync(
@@ -90,12 +105,6 @@ try {
   assert(tarballPath, 'Expected the packed tarball path.');
   assert(existsSync(tarballPath), `Tarball does not exist: ${tarballPath}`);
   assert(
-    JSON.stringify(packedFiles) === JSON.stringify(expectedFiles),
-    `Unexpected tarball contents.\nExpected:\n${expectedFiles.join(
-      '\n'
-    )}\nActual:\n${packedFiles.join('\n')}`
-  );
-  assert(
     !packedFiles.some((filePath) =>
       /^(?:src|test|examples?|scripts|docs|coverage|\.github)\//.test(filePath)
     ),
@@ -104,7 +113,11 @@ try {
 
   writeFileSync(
     path.join(consumerDirectory, 'package.json'),
-    JSON.stringify({ name: 'package-smoke-consumer', private: true })
+    JSON.stringify({
+      name: 'package-smoke-consumer',
+      private: true,
+      type: 'module'
+    })
   );
   run('npm', [
     'install',
@@ -120,35 +133,60 @@ try {
     '@prodigyems',
     'graphql-sequelize'
   );
-  const publicApi = require(installedPackage);
-  const compiledPublicApi = require(
-    path.join(installedPackage, 'lib', 'index.js')
+  const consumerScriptPath = path.join(consumerDirectory, 'package-smoke.mjs');
+  writeFileSync(
+    consumerScriptPath,
+    [
+      "import { readFileSync } from 'node:fs';",
+      "import path from 'node:path';",
+      '',
+      "const publicApi = await import('@prodigyems/graphql-sequelize');",
+      'const expectedExports = JSON.parse(process.argv[2]);',
+      'const actualExports = Object.keys(publicApi).sort();',
+      "const packageRoot = path.join(process.cwd(), 'node_modules', '@prodigyems', 'graphql-sequelize');",
+      '',
+      'if (JSON.stringify(actualExports) !== JSON.stringify(expectedExports)) {',
+      "  throw new Error('Unexpected public exports: ' + actualExports.join(', '));",
+      '}',
+      '',
+      'for (const exportName of expectedExports) {',
+      "  const expectedType = exportName === 'relay' || exportName === 'typeMapper' ||",
+      "    exportName === 'JSONType' || exportName === 'DateType'",
+      "    ? 'object'",
+      "    : 'function';",
+      '',
+      '  if (typeof publicApi[exportName] !== expectedType) {',
+      "    throw new Error(exportName + ' has the wrong runtime type.');",
+      '  }',
+      '}',
+      '',
+      "const declarations = readFileSync(path.join(packageRoot, 'lib', 'index.d.ts'), 'utf8');",
+      'for (const exportName of expectedExports) {',
+      "  if (!new RegExp('\\\\b' + exportName + '\\\\b').test(declarations)) {",
+      "    throw new Error('Generated root declarations omit ' + exportName + '.');",
+      '  }',
+      '}',
+      '',
+      'let deepImportError;',
+      'try {',
+      "  await import('@prodigyems/graphql-sequelize/lib/argsToFindOptions.js');",
+      '} catch (error) {',
+      '  deepImportError = error;',
+      '}',
+      '',
+      "if (!deepImportError || deepImportError.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') {",
+      "  throw new Error('Deep package imports must fail with ERR_PACKAGE_PATH_NOT_EXPORTED.');",
+      '}',
+      ''
+    ].join('\n')
   );
-  const argsToFindOptions = require(
-    path.join(installedPackage, 'lib', 'argsToFindOptions.js')
-  );
+  run(process.execPath, [consumerScriptPath, JSON.stringify(expectedExports)]);
 
-  assert(typeof publicApi.resolver === 'function', 'resolver is not callable.');
   assert(
-    typeof compiledPublicApi.resolver === 'function',
-    'The direct compiled package entry point is not usable.'
-  );
-  assert(
-    typeof publicApi.argsToFindOptions === 'function',
-    'argsToFindOptions is not callable.'
-  );
-  assert(
-    typeof publicApi.sequelizeConnection === 'function',
-    'sequelizeConnection is not callable.'
-  );
-  assert(
-    typeof argsToFindOptions.default === 'function',
-    'The direct argsToFindOptions module is not usable.'
-  );
-  assert(
-    readFileSync(path.join(installedPackage, 'types', 'index.d.ts'), 'utf8')
-      .includes('export const resolver'),
-    'The package-owned TypeScript declarations are missing.'
+    JSON.stringify(packedFiles) === JSON.stringify(expectedFiles),
+    `Unexpected tarball contents.\nExpected:\n${expectedFiles.join(
+      '\n'
+    )}\nActual:\n${packedFiles.join('\n')}`
   );
 
   const relayDeclarations = readFileSync(
@@ -173,12 +211,12 @@ try {
   writeFileSync(
     path.join(consumerDirectory, 'relay-types.ts'),
     [
-      "import { handleConnection } from '@prodigyems/graphql-sequelize/lib/relay.js';",
-      "import type { NodeInterfaceDefinition } from '@prodigyems/graphql-sequelize/lib/contracts.js';",
+      "import { relay } from '@prodigyems/graphql-sequelize';",
+      "import type { NodeInterfaceDefinition } from '@prodigyems/graphql-sequelize';",
       '',
       'declare const nodeInterface: NodeInterfaceDefinition;',
       'const nodesField = nodeInterface.nodesField;',
-      "const connection = handleConnection([{ id: 1 }], { first: 1 });",
+      "const connection = relay.handleConnection([{ id: 1 }], { first: 1 });",
       '',
       'void nodesField;',
       'void connection;',
@@ -189,8 +227,8 @@ try {
     path.join(consumerDirectory, 'tsconfig.json'),
     JSON.stringify({
       compilerOptions: {
-        module: 'Node16',
-        moduleResolution: 'Node16',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
         noEmit: true,
         skipLibCheck: false,
         strict: true,

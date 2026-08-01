@@ -2,9 +2,9 @@
 
 import {expect} from 'chai';
 import Sequelize from 'sequelize';
-import defaultListArgs from '../../src/defaultListArgs';
+import defaultListArgs from '../../src/defaultListArgs.js';
 
-import { sequelize } from '../support/helper';
+import { sequelize } from '../support/helper.js';
 
 import {
   GraphQLString,

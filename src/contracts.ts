@@ -18,6 +18,12 @@ import type {
   Sequelize
 } from 'sequelize';
 
+export type {AttributeFieldsOptions} from './attributeFields.js';
+export type {
+  SimplifiedAST,
+  SimplifiedASTCollection
+} from './simplifyAST.js';
+
 /** A value that may be returned immediately or through a promise-like object. */
 export type MaybePromise<T> = T | PromiseLike<T>;
 

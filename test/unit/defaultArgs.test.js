@@ -3,11 +3,11 @@
 
 import {expect} from 'chai';
 import Sequelize from 'sequelize';
-import defaultArgs from '../../src/defaultArgs';
-import {mapType} from '../../src/typeMapper';
-import DateType from '../../src/types/dateType';
+import defaultArgs from '../../src/defaultArgs.js';
+import {mapType} from '../../src/typeMapper.js';
+import DateType from '../../src/types/dateType.js';
 
-import { sequelize } from '../support/helper';
+import { sequelize } from '../support/helper.js';
 
 import {
   GraphQLString,

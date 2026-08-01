@@ -1,7 +1,7 @@
 import { expect } from 'chai';
-import { mapType, toGraphQL } from '../../src/typeMapper';
-import JSONType from '../../src/types/jsonType';
-import DateType from '../../src/types/dateType';
+import { mapType, toGraphQL } from '../../src/typeMapper.js';
+import JSONType from '../../src/types/jsonType.js';
+import DateType from '../../src/types/dateType.js';
 
 import Sequelize from 'sequelize';
 
@@ -65,9 +65,14 @@ describe('typeMapper', () => {
   });
 
   describe('CUSTOM', function () {
+    const customDataType = {toSql: () => 'CUSTOM'};
+
     before(function () {
       // setup mapping
       mapType((type)=> {
+        if (type === customDataType) {
+          return GraphQLString;
+        }
         if (type instanceof BOOLEAN) {
           return GraphQLString;
         }
@@ -81,6 +86,25 @@ describe('typeMapper', () => {
     });
     it('should allow the user to map types to anything', function () {
       expect(toGraphQL(new BOOLEAN(), Sequelize)).to.equal(GraphQLString);
+    });
+    it('should run custom mappings before validating built-in inputs', function () {
+      expect(toGraphQL(customDataType, {STRING})).to.equal(GraphQLString);
+    });
+    it('should validate built-in inputs after custom mapping falls back', function () {
+      expect(() => toGraphQL({toSql: () => 'UNMAPPED'}, {STRING}))
+        .to.throw(TypeError, 'Expected the Sequelize data type registry.');
+    });
+    it('should apply custom mappings to ARRAY element types', function () {
+      const arrayType = new ARRAY(STRING);
+      arrayType.type = customDataType;
+      const graphQLType = toGraphQL(arrayType, Sequelize);
+
+      expect(graphQLType).to.be.instanceof(GraphQLList);
+      expect(graphQLType.ofType).to.equal(GraphQLString);
+    });
+    it('should apply custom mappings to VIRTUAL return types', function () {
+      expect(toGraphQL(new VIRTUAL(customDataType), Sequelize))
+        .to.equal(GraphQLString);
     });
 
     // reset mapType

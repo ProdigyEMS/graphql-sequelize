@@ -2,10 +2,10 @@
 
 import {expect} from 'chai';
 import Sequelize from 'sequelize';
-import attributeFields from '../../src/attributeFields';
-import DateType from '../../src/types/dateType';
+import attributeFields from '../../src/attributeFields.js';
+import DateType from '../../src/types/dateType.js';
 
-import { sequelize } from '../support/helper';
+import { sequelize } from '../support/helper.js';
 
 
 import {

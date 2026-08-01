@@ -202,15 +202,4 @@ module.exports = [
       sourceType: 'commonjs',
     },
   },
-  {
-    files: ['test/benchmark/seed.js'],
-    languageOptions: {
-      parserOptions: {
-        ecmaFeatures: {
-          globalReturn: true,
-        },
-      },
-      sourceType: 'commonjs',
-    },
-  },
 ];

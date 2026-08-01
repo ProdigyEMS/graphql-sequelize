@@ -2,9 +2,15 @@
   "name": "@prodigyems/graphql-sequelize",
   "version": "1.0.0",
   "description": "GraphQL and Relay helpers for Sequelize 6",
-  "main": "lib/index.js",
-  "types": "types/index.d.ts",
-  "type": "commonjs",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    }
+  },
   "scripts": {
     "prepare": "npm run build",
     "prepack": "npm run build",
@@ -16,7 +22,7 @@
     "test:watch": "npm run test:unit -- --watch",
     "test:unit": "npm run build:test && mocha \".build/test/unit/**/*.test.js\"",
     "test:inventory": "node scripts/verify-test-inventory.cjs",
-    "test:types": "tsc --project test/types/tsconfig.json",
+    "test:types": "npm run build && tsc --project test/types/tsconfig.json",
     "test:package": "node scripts/verify-package.cjs",
     "test:graphql17": "sh scripts/test-graphql17.sh",
     "build:docker": "docker compose build",
@@ -45,7 +51,6 @@
   "homepage": "https://github.com/ProdigyEMS/graphql-sequelize#readme",
   "files": [
     "lib/",
-    "types/",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -75,6 +80,7 @@
     "eslint": "^9.37.0",
     "globals": "^15.15.0",
     "graphql": "^16.6.0",
+    "graphql-http": "^1.22.4",
     "graphql-relay": "^0.10.2",
     "mocha": "^11.7.4",
     "mysql2": "^3.15.4",

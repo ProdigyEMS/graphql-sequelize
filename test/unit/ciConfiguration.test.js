@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { ESLint } from 'eslint';
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
-import { createSequelize } from '../support/helper';
+import { createSequelize } from '../support/helper.js';
 
 const repositoryFile = (filePath) =>
   readFileSync(path.resolve(filePath), 'utf8');
@@ -91,7 +91,7 @@ describe('continuous integration configuration', function () {
 
     expect(buildConfig).to.deep.equal({
       compilerOptions: {
-        allowJs: true,
+        allowJs: false,
         checkJs: false,
         declaration: true,
         declarationMap: true,
@@ -107,7 +107,7 @@ describe('continuous integration configuration', function () {
         strict: true,
         target: 'ES2022'
       },
-      include: ['src/**/*.js', 'src/**/*.ts']
+      include: ['src/**/*.ts']
     });
     expect(testConfig).to.deep.equal({
       extends: './tsconfig.build.json',
@@ -125,9 +125,9 @@ describe('continuous integration configuration', function () {
         'test/support/**/*.js'
       ]
     });
-    expect(packageJson.type).to.equal('commonjs');
-    expect(packageJson.main).to.equal('lib/index.js');
-    expect(packageJson.types).to.equal('types/index.d.ts');
+    expect(packageJson.type).to.equal('module');
+    expect(packageJson.main).to.equal('./lib/index.js');
+    expect(packageJson.types).to.equal('./lib/index.d.ts');
     expect(packageJson.scripts.build).to.equal(
       'node scripts/clean-build.cjs && tsc -p tsconfig.build.json'
     );

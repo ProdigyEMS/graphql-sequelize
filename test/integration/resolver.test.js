@@ -1,14 +1,14 @@
 'use strict';
 
-import { delay, sequelize, Promise, beforeRemoveAllTables, markFilterable } from '../support/helper';
+import { delay, sequelize, Promise, beforeRemoveAllTables, markFilterable } from '../support/helper.js';
 
 import { expect } from 'chai';
 import sinon from 'sinon';
 import Sequelize, { Op } from 'sequelize';
 
-import resolver from '../../src/resolver';
-import { createConnection } from '../../src/relay';
-import JSONType from '../../src/types/jsonType';
+import resolver from '../../src/resolver.js';
+import { createConnection } from '../../src/relay.js';
+import JSONType from '../../src/types/jsonType.js';
 
 import {
   graphql,

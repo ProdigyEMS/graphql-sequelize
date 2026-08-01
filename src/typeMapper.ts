@@ -103,8 +103,56 @@ interface SequelizeDataTypes {
   readonly INET: SequelizeDataTypeConstructor;
 }
 
+const sequelizeDataTypeConstructorNames: ReadonlyArray<
+  keyof SequelizeDataTypes
+> = [
+  'BOOLEAN',
+  'ENUM',
+  'FLOAT',
+  'REAL',
+  'CHAR',
+  'DECIMAL',
+  'DOUBLE',
+  'INTEGER',
+  'BIGINT',
+  'STRING',
+  'TEXT',
+  'UUID',
+  'UUIDV4',
+  'DATE',
+  'DATEONLY',
+  'TIME',
+  'ARRAY',
+  'VIRTUAL',
+  'JSON',
+  'JSONB',
+  'CITEXT',
+  'INET'
+];
+
+/**
+ * Narrow a legacy public mapper argument to Sequelize's datatype registry.
+ *
+ * @param value value supplied by a package consumer
+ * @return whether all constructors used by the mapper are available
+ */
+function isSequelizeDataTypes(value: unknown): value is SequelizeDataTypes {
+  if (
+    value === null ||
+    (typeof value !== 'object' && typeof value !== 'function')
+  ) {
+    return false;
+  }
+
+  const dataTypes = value as Record<string, unknown>;
+
+  return sequelizeDataTypeConstructorNames.every(
+    (constructorName) => typeof dataTypes[constructorName] === 'function'
+  );
+}
+
 export type CustomTypeMapper = (
-  sequelizeType: SequelizeDataType
+  sequelizeType: unknown
 ) => GraphQLOutputType | null | undefined;
 
 let customTypeMapper: CustomTypeMapper | null | undefined;
@@ -126,18 +174,37 @@ export function mapType(mapFunc: CustomTypeMapper | null | undefined): void {
  * @return GraphQL type declaration
  */
 export function toGraphQL(
+  sequelizeType: unknown,
+  sequelizeTypes: unknown
+): GraphQLOutputType {
+  if (customTypeMapper) {
+    const customType = customTypeMapper(sequelizeType);
+
+    if (customType) return customType;
+  }
+
+  if (!isSequelizeDataTypeInstance(sequelizeType)) {
+    throw new TypeError('Expected a Sequelize data type instance.');
+  }
+
+  if (!isSequelizeDataTypes(sequelizeTypes)) {
+    throw new TypeError('Expected the Sequelize data type registry.');
+  }
+
+  return mapToGraphQL(sequelizeType, sequelizeTypes);
+}
+
+/**
+ * Map validated Sequelize datatype inputs to GraphQL output types.
+ *
+ * @param sequelizeType validated Sequelize datatype instance
+ * @param sequelizeTypes validated Sequelize datatype constructors
+ * @return GraphQL type declaration
+ */
+function mapToGraphQL(
   sequelizeType: SequelizeDataType,
   sequelizeTypes: SequelizeDataTypes
 ): GraphQLOutputType {
-
-  // did the user supply a mapping function?
-  // use their mapping, if it returns truthy
-  // else use our defaults
-  if (customTypeMapper) {
-    const result = customTypeMapper(sequelizeType);
-    if (result) return result;
-  }
-
   const {
     BOOLEAN,
     ENUM,

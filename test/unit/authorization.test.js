@@ -1,8 +1,8 @@
 'use strict';
 
 import { expect } from 'chai';
-import { replaceWhereOperators } from '../../src/replaceWhereOperators';
-import argsToFindOptions from '../../src/argsToFindOptions';
+import { replaceWhereOperators } from '../../src/replaceWhereOperators.js';
+import argsToFindOptions from '../../src/argsToFindOptions.js';
 import Sequelize from 'sequelize';
 
 /**

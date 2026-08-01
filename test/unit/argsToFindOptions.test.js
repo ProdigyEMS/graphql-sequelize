@@ -1,7 +1,7 @@
 'use strict';
 
 import { expect } from 'chai';
-import argsToFindOptions from '../../src/argsToFindOptions';
+import argsToFindOptions from '../../src/argsToFindOptions.js';
 
 describe('argsToFindOptions', function () {
   // 'property' is included because these specs filter on it. Scalar where

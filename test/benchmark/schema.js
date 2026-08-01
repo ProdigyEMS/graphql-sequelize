@@ -13,13 +13,13 @@ import {
   connectionArgs
 } from 'graphql-relay';
 
-import resolver from '../../lib/resolver';
+import resolver from '../../lib/resolver.js';
 
 import {
   sequelizeNodeInterface
-} from '../../lib/relay';
+} from '../../lib/relay.js';
 
-import { sequelize, models } from './models';
+import { sequelize, models } from './models.js';
 
 const node = sequelizeNodeInterface(sequelize);
 const nodeInterface = node.nodeInterface;

@@ -1,9 +1,9 @@
 'use strict';
 
-import { sequelize, Promise, beforeRemoveAllTables, markFilterable } from '../support/helper';
+import { sequelize, Promise, beforeRemoveAllTables, markFilterable } from '../support/helper.js';
 
 import { expect } from 'chai';
-import resolver from '../../src/resolver';
+import resolver from '../../src/resolver.js';
 import Sequelize from 'sequelize';
 
 import {
@@ -18,7 +18,7 @@ import {
 
 import {
   sequelizeNodeInterface
-} from '../../src/relay';
+} from '../../src/relay.js';
 
 import {
   globalIdField,

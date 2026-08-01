@@ -7,17 +7,24 @@ import {
   GraphQLObjectType,
   GraphQLSchema,
   GraphQLString,
+  parse,
   validate
 } from 'graphql';
-import simplifyAST from '../../src/simplifyAST';
-var parser = require('graphql/language/parser').parse
-  , parse = function (query) {
-    return parser(query).definitions[0];
-  };
+import simplifyAST from '../../src/simplifyAST.js';
+
+/**
+ * Parse a GraphQL document and return its first definition.
+ *
+ * @param {string} query GraphQL query text
+ * @return {import('graphql').DefinitionNode} first parsed definition
+ */
+function parseFirstDefinition(query) {
+  return parse(query).definitions[0];
+}
 
 describe('simplifyAST', function () {
   it('should simplify a basic nested structure', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         users {
           name
@@ -52,7 +59,7 @@ describe('simplifyAST', function () {
   });
 
   it('should simplify a basic structure with args', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         user(id: 1) {
           name
@@ -77,7 +84,7 @@ describe('simplifyAST', function () {
   });
 
   it('should simplify a basic structure with array args', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         luke: human(id: ["1000", "1003"]) {
           name
@@ -103,7 +110,7 @@ describe('simplifyAST', function () {
   });
 
   it('should simplify a basic structure with object args', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         luke: human(contact: { phone: "91264646" }) {
           name
@@ -129,7 +136,7 @@ describe('simplifyAST', function () {
   });
 
   it('should simplify a basic structure with nested array args', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         user(units: ["1", "2", ["3", ["4"], [["5"], "6"], "7"]]) {
           name
@@ -154,7 +161,7 @@ describe('simplifyAST', function () {
   });
 
   it('should simplify a basic structure with variable args', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         user(id: $id) {
           name
@@ -295,7 +302,7 @@ describe('simplifyAST', function () {
   });
 
   it('should simplify a basic structure with an inline fragment', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         user {
           ... on User {
@@ -373,7 +380,7 @@ describe('simplifyAST', function () {
   });
 
   it('should ignore a fragment spread without fragment information', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         user {
           ...Missing
@@ -391,20 +398,20 @@ describe('simplifyAST', function () {
   });
 
   it('should ignore inherited fragment map entries', function () {
-    const inheritedFragment = parser(`
+    const inheritedFragment = parseFirstDefinition(`
       fragment Inherited on User {
         leaked
       }
-    `).definitions[0];
-    const presentFragment = parser(`
+    `);
+    const presentFragment = parseFirstDefinition(`
       fragment Present on User {
         present
       }
-    `).definitions[0];
+    `);
     const fragments = Object.create({Inherited: inheritedFragment});
     fragments.Present = presentFragment;
 
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         user {
           ...Inherited
@@ -422,7 +429,7 @@ describe('simplifyAST', function () {
   });
 
   it('should expose a $parent', function () {
-    var ast = simplifyAST(parse(`
+    var ast = simplifyAST(parseFirstDefinition(`
       {
         users {
           name
@@ -442,7 +449,7 @@ describe('simplifyAST', function () {
   });
 
   it('should simplify a nested structure at the lowest level', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         users {
           name
@@ -491,7 +498,7 @@ describe('simplifyAST', function () {
   });
 
   it('should simplify a nested structure duplicated at a high level', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         users {
           name
@@ -542,7 +549,7 @@ describe('simplifyAST', function () {
   });
 
   it('should simplify a structure with aliases', function () {
-    expect(simplifyAST(parse(`
+    expect(simplifyAST(parseFirstDefinition(`
       {
         luke: human(id: "1000") {
           name
@@ -602,7 +609,7 @@ describe('simplifyAST', function () {
         }
       })
     });
-    const document = parser(`
+    const document = parse(`
       {
         __proto__: viewer {
           name

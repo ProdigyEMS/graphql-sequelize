@@ -3,15 +3,15 @@
 import {expect} from 'chai';
 import Sequelize from 'sequelize';
 import sinon from 'sinon';
-import attributeFields from '../../../src/attributeFields';
-import resolver from '../../../src/resolver';
-import {uniq, property, sortBy} from 'lodash';
-import { Promise, sequelize, markFilterable, beforeRemoveAllTables } from '../../support/helper';
+import attributeFields from '../../../src/attributeFields.js';
+import resolver from '../../../src/resolver.js';
+import lodash from 'lodash';
+import { Promise, sequelize, markFilterable, beforeRemoveAllTables } from '../../support/helper.js';
 
 import {
   sequelizeConnection,
   createConnectionResolver
-} from '../../../src/relay';
+} from '../../../src/relay.js';
 
 import {
   GraphQLInt,
@@ -29,6 +29,8 @@ import {
   toGlobalId,
   fromGlobalId
 } from 'graphql-relay';
+
+const {uniq, property, sortBy} = lodash;
 
 /**
  * Fail a GraphQL integration query with the underlying database message and

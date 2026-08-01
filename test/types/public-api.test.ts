@@ -10,58 +10,48 @@ import { GraphQLObjectType, GraphQLString } from 'graphql';
 import type { Association, FindOptions, Model, ModelStatic } from 'sequelize';
 import { DataTypes } from 'sequelize';
 import type {
-  ConnectionResult,
-  ResolverOptions,
-  SimplifiedAST as RootSimplifiedAST,
-  SimplifiedASTCollection as RootSimplifiedASTCollection
-} from '../..';
-import generatedAttributeFields from '../../lib/attributeFields.js';
-import type { AttributeFieldsOptions as GeneratedAttributeFieldsOptions } from '../../lib/attributeFields.js';
-import generatedDefaultArgs from '../../lib/defaultArgs.js';
-import generatedDefaultListArgs from '../../lib/defaultListArgs.js';
-import generatedResolver from '../../lib/resolver.js';
-import type {
+  AttributeFieldsOptions as GeneratedAttributeFieldsOptions,
   ConnectionDefinition as GeneratedConnectionDefinition,
   ConnectionEdge as GeneratedConnectionEdge,
+  ConnectionResult,
   ConnectionResult as GeneratedConnectionResult,
   ConnectionResolver as GeneratedConnectionResolver,
   ConnectionResolverOptions as GeneratedConnectionResolverOptions,
   NodeInterfaceDefinition as GeneratedNodeInterfaceDefinition,
   NodeTypeMapping as GeneratedNodeTypeMapping,
+  ResolverOptions,
   ResolverFactory as GeneratedResolverFactory,
   ResolverOptions as GeneratedResolverOptions,
-  ResolverTarget as GeneratedResolverTarget
-} from '../../lib/contracts.js';
-import {
-  NodeTypeMapper as GeneratedNodeTypeMapper,
-  createConnection as generatedCreateConnection,
-  createConnectionResolver as generatedCreateConnectionResolver,
-  createNodeInterface as generatedCreateNodeInterface,
-  typeResolver as generatedTypeResolver
-} from '../../lib/relay.js';
-import generatedSimplifyAST from '../../lib/simplifyAST.js';
-import type {
+  ResolverTarget as GeneratedResolverTarget,
   SimplifiedAST as GeneratedSimplifiedAST,
-  SimplifiedASTCollection as GeneratedSimplifiedASTCollection
-} from '../../lib/simplifyAST.js';
-import * as generatedTypeMapper from '../../lib/typeMapper.js';
+  SimplifiedAST as RootSimplifiedAST,
+  SimplifiedASTCollection as GeneratedSimplifiedASTCollection,
+  SimplifiedASTCollection as RootSimplifiedASTCollection
+} from '@prodigyems/graphql-sequelize';
 
 import {
   argsToFindOptions,
-  resolver,
-  defaultListArgs,
-  defaultArgs,
-  typeMapper,
   attributeFields,
-  simplifyAST,
+  attributeFields as generatedAttributeFields,
+  DateType,
+  defaultArgs,
+  defaultArgs as generatedDefaultArgs,
+  defaultListArgs,
+  defaultListArgs as generatedDefaultListArgs,
+  JSONType,
   relay,
+  relay as generatedRelay,
+  resolver,
+  resolver as generatedResolver,
   sequelizeConnection,
+  simplifyAST,
+  simplifyAST as generatedSimplifyAST,
+  typeMapper,
+  typeMapper as generatedTypeMapper,
   createConnection,
   createConnectionResolver,
-  createNodeInterface,
-  JSONType,
-  DateType
-} from '../..';
+  createNodeInterface
+} from '@prodigyems/graphql-sequelize';
 
 interface ResolverContext {
   organizationId: number;
@@ -83,6 +73,14 @@ interface TransformedConnectionOutput extends GeneratedConnectionResult<
 > {
   extra: string;
 }
+
+type CustomTypeMapper = NonNullable<Parameters<typeof typeMapper.mapType>[0]>;
+type CustomTypeMapperInput = Parameters<CustomTypeMapper>[0];
+type IsUnknown<T> = unknown extends T
+  ? [keyof T] extends [never]
+    ? true
+    : false
+  : false;
 
 declare const User: ModelStatic<Model>;
 declare const UserTasks: Association<Model, Model>;
@@ -218,6 +216,7 @@ const generatedMappedType = generatedTypeMapper.toGraphQL(
   new DataTypes.INTEGER(),
   DataTypes
 );
+const customMapperAcceptsUnknown: IsUnknown<CustomTypeMapperInput> = true;
 const userType = new GraphQLObjectType({
   name: 'PublicApiTypeUser',
   fields: {
@@ -274,7 +273,7 @@ const generatedConnectionResolver: GeneratedConnectionResolver<
   unknown,
   ConnectionArgs,
   ResolverContext
-> = generatedCreateConnectionResolver<
+> = generatedRelay.createConnectionResolver<
   unknown,
   unknown,
   ConnectionArgs,
@@ -285,7 +284,12 @@ const generatedConnection: GeneratedConnectionDefinition<
   unknown,
   ConnectionArgs,
   ResolverContext
-> = generatedCreateConnection<unknown, unknown, ConnectionArgs, ResolverContext>({
+> = generatedRelay.createConnection<
+  unknown,
+  unknown,
+  ConnectionArgs,
+  ResolverContext
+>({
   name: 'GeneratedPublicApiUser',
   nodeType: userType,
   target: UserTasks,
@@ -293,7 +297,7 @@ const generatedConnection: GeneratedConnectionDefinition<
   after: connectionAfter,
   where: connectionWhere
 });
-const generatedNodeTypeMapper = new GeneratedNodeTypeMapper();
+const generatedNodeTypeMapper = new generatedRelay.NodeTypeMapper();
 const generatedModelNodeMapping: GeneratedNodeTypeMapping = {
   type: userType,
   resolve: () => User.build()
@@ -310,13 +314,13 @@ generatedNodeTypeMapper.mapTypes({
   PublicApiModelUser: generatedModelNodeMapping,
   PublicApiCallableUser: generatedCallableNodeMapping
 });
-const generatedModelNodeType: string | null = generatedTypeResolver(
+const generatedModelNodeType: string | null = generatedRelay.typeResolver(
   generatedNodeTypeMapper
 )(User.build());
-const generatedCallableNodeType: string | null = generatedTypeResolver(
+const generatedCallableNodeType: string | null = generatedRelay.typeResolver(
   generatedNodeTypeMapper
 )(generatedCallableNode);
-const typedGeneratedConnection = generatedCreateConnection<
+const typedGeneratedConnection = generatedRelay.createConnection<
   Model,
   ConnectionSource,
   ConnectionArgs,
@@ -359,7 +363,7 @@ const generatedStandaloneStatus: string | undefined =
   generatedStandaloneEdge.sourceArgs.status;
 const generatedStandaloneArgs: ConnectionArgs | Record<string, never> =
   generatedStandaloneEdge.sourceArgs;
-const transformedGeneratedConnection = generatedCreateConnection<
+const transformedGeneratedConnection = generatedRelay.createConnection<
   Model,
   ConnectionSource,
   ConnectionArgs,
@@ -381,7 +385,7 @@ const transformedGeneratedConnection = generatedCreateConnection<
   }
 });
 const generatedNodeInterface: GeneratedNodeInterfaceDefinition<ResolverContext> =
-  generatedCreateNodeInterface<ResolverContext>(sequelize);
+  generatedRelay.createNodeInterface<ResolverContext>(sequelize);
 const legacyGeneratedNodeInterface: GeneratedNodeInterfaceDefinition<
   ResolverContext
 > = {
@@ -458,6 +462,7 @@ void rootCollectionFields;
 void rootEmptyCollectionFields;
 void mappedType;
 void generatedMappedType;
+void customMapperAcceptsUnknown;
 void connection;
 void sameConnection;
 void connectionResolver;
@@ -498,7 +503,7 @@ createConnection({ target: User });
 sequelizeConnection({ target: User });
 
 const customResolverWithoutAfter = { target: UserTasks };
-generatedCreateConnectionResolver<
+generatedRelay.createConnectionResolver<
   Model,
   ConnectionSource,
   ConnectionArgs,
@@ -514,7 +519,7 @@ const customConnectionWithoutAfter = {
   nodeType: userType,
   target: UserTasks
 };
-generatedCreateConnection<
+generatedRelay.createConnection<
   Model,
   ConnectionSource,
   ConnectionArgs,

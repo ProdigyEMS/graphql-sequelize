@@ -1,5 +1,5 @@
 import {expect} from 'chai';
-import {replaceWhereOperators} from '../../src/replaceWhereOperators';
+import {replaceWhereOperators} from '../../src/replaceWhereOperators.js';
 import {Sequelize} from 'sequelize';
 
 const [seqMajVer] = Sequelize.version.split('.');

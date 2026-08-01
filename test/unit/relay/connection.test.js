@@ -2,8 +2,8 @@ import Sequelize from 'sequelize';
 import {expect} from 'chai';
 import { existsSync, readFileSync } from 'fs';
 import sinon from 'sinon';
-import { sequelize } from '../../support/helper';
-import attributeFields from '../../../src/attributeFields';
+import { sequelize } from '../../support/helper.js';
+import attributeFields from '../../../src/attributeFields.js';
 
 import {
   GraphQLObjectType,
@@ -22,7 +22,7 @@ import {
   idFetcher,
   sequelizeConnection,
   typeResolver
-} from '../../../src/relay';
+} from '../../../src/relay.js';
 
 describe('relay', function () {
   it('uses a typed static resolver import without a CommonJS bridge', function () {

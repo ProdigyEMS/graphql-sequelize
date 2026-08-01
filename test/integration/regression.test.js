@@ -18,13 +18,13 @@ import {
   connectionDefinitions
 } from 'graphql-relay';
 
-import resolver from '../../src/resolver';
-import { sequelizeConnection, sequelizeNodeInterface } from '../../src/relay';
+import resolver from '../../src/resolver.js';
+import { sequelizeConnection, sequelizeNodeInterface } from '../../src/relay.js';
 import {
   sequelize,
   markFilterable,
   beforeRemoveAllTables
-} from '../support/helper';
+} from '../support/helper.js';
 
 /**
  * Regression coverage.

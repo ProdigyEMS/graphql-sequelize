@@ -1,4 +1,4 @@
-import {createSequelize} from '../support/helper';
+import {createSequelize} from '../support/helper.js';
 import Sequelize from 'sequelize';
 const sequelize = createSequelize({
   pool: {
