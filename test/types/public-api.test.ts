@@ -21,10 +21,24 @@ import generatedDefaultArgs from '../../lib/defaultArgs.js';
 import generatedDefaultListArgs from '../../lib/defaultListArgs.js';
 import generatedResolver from '../../lib/resolver.js';
 import type {
+  ConnectionDefinition as GeneratedConnectionDefinition,
+  ConnectionEdge as GeneratedConnectionEdge,
+  ConnectionResult as GeneratedConnectionResult,
+  ConnectionResolver as GeneratedConnectionResolver,
+  ConnectionResolverOptions as GeneratedConnectionResolverOptions,
+  NodeInterfaceDefinition as GeneratedNodeInterfaceDefinition,
+  NodeTypeMapping as GeneratedNodeTypeMapping,
   ResolverFactory as GeneratedResolverFactory,
   ResolverOptions as GeneratedResolverOptions,
   ResolverTarget as GeneratedResolverTarget
 } from '../../lib/contracts.js';
+import {
+  NodeTypeMapper as GeneratedNodeTypeMapper,
+  createConnection as generatedCreateConnection,
+  createConnectionResolver as generatedCreateConnectionResolver,
+  createNodeInterface as generatedCreateNodeInterface,
+  typeResolver as generatedTypeResolver
+} from '../../lib/relay.js';
 import generatedSimplifyAST from '../../lib/simplifyAST.js';
 import type {
   SimplifiedAST as GeneratedSimplifiedAST,
@@ -56,6 +70,18 @@ interface ResolverContext {
 interface ConnectionArgs {
   first?: number;
   status?: string;
+}
+
+interface ConnectionSource {
+  viewerId: number;
+}
+
+interface TransformedConnectionOutput extends GeneratedConnectionResult<
+  Model,
+  ConnectionSource,
+  ConnectionArgs
+> {
+  extra: string;
 }
 
 declare const User: ModelStatic<Model>;
@@ -232,6 +258,142 @@ const connectionWhere = (
   ...currentWhere,
   [key]: value
 });
+const generatedConnectionOptions: GeneratedConnectionResolverOptions<
+  unknown,
+  unknown,
+  ConnectionArgs,
+  ResolverContext
+> = {
+  target: UserTasks,
+  before: connectionBefore,
+  after: connectionAfter,
+  where: connectionWhere
+};
+const generatedConnectionResolver: GeneratedConnectionResolver<
+  unknown,
+  unknown,
+  ConnectionArgs,
+  ResolverContext
+> = generatedCreateConnectionResolver<
+  unknown,
+  unknown,
+  ConnectionArgs,
+  ResolverContext
+>(generatedConnectionOptions);
+const generatedConnection: GeneratedConnectionDefinition<
+  unknown,
+  unknown,
+  ConnectionArgs,
+  ResolverContext
+> = generatedCreateConnection<unknown, unknown, ConnectionArgs, ResolverContext>({
+  name: 'GeneratedPublicApiUser',
+  nodeType: userType,
+  target: UserTasks,
+  before: connectionBefore,
+  after: connectionAfter,
+  where: connectionWhere
+});
+const generatedNodeTypeMapper = new GeneratedNodeTypeMapper();
+const generatedModelNodeMapping: GeneratedNodeTypeMapping = {
+  type: userType,
+  resolve: () => User.build()
+};
+const generatedCallableNode = Object.assign(function generatedCallableNode() {}, {
+  value: 'custom value'
+});
+const generatedCallableNodeMapping: GeneratedNodeTypeMapping = {
+  type: userType,
+  resolve: () => generatedCallableNode
+};
+generatedNodeTypeMapper.mapTypes({
+  PublicApiTypeUser: userType,
+  PublicApiModelUser: generatedModelNodeMapping,
+  PublicApiCallableUser: generatedCallableNodeMapping
+});
+const generatedModelNodeType: string | null = generatedTypeResolver(
+  generatedNodeTypeMapper
+)(User.build());
+const generatedCallableNodeType: string | null = generatedTypeResolver(
+  generatedNodeTypeMapper
+)(generatedCallableNode);
+const typedGeneratedConnection = generatedCreateConnection<
+  Model,
+  ConnectionSource,
+  ConnectionArgs,
+  ResolverContext
+>({
+  name: 'GeneratedTypedPublicApiUser',
+  nodeType: userType,
+  target: UserTasks,
+  connectionFields: {
+    fullCountText: {
+      type: GraphQLString,
+      resolve: (
+        source: GeneratedConnectionResult<
+          Model,
+          ConnectionSource,
+          ConnectionArgs
+        >
+      ) => String(source.fullCount)
+    }
+  },
+  edgeFields: {
+    viewerId: {
+      type: GraphQLString,
+      resolve: (
+        source: GeneratedConnectionEdge<
+          Model,
+          ConnectionSource,
+          ConnectionArgs
+        >
+      ) => String(source.source?.viewerId)
+    }
+  }
+});
+const generatedStandaloneEdge = typedGeneratedConnection.resolveEdge(
+  User.build()
+);
+const generatedStandaloneSource: ConnectionSource | undefined =
+  generatedStandaloneEdge.source;
+const generatedStandaloneStatus: string | undefined =
+  generatedStandaloneEdge.sourceArgs.status;
+const generatedStandaloneArgs: ConnectionArgs | Record<string, never> =
+  generatedStandaloneEdge.sourceArgs;
+const transformedGeneratedConnection = generatedCreateConnection<
+  Model,
+  ConnectionSource,
+  ConnectionArgs,
+  ResolverContext,
+  TransformedConnectionOutput
+>({
+  name: 'GeneratedTransformedPublicApiUser',
+  nodeType: userType,
+  target: UserTasks,
+  after: (result) => ({
+    ...result,
+    extra: 'transformed'
+  }),
+  connectionFields: {
+    extra: {
+      type: GraphQLString,
+      resolve: (source) => source.extra
+    }
+  }
+});
+const generatedNodeInterface: GeneratedNodeInterfaceDefinition<ResolverContext> =
+  generatedCreateNodeInterface<ResolverContext>(sequelize);
+const legacyGeneratedNodeInterface: GeneratedNodeInterfaceDefinition<
+  ResolverContext
+> = {
+  nodeTypeMapper: generatedNodeInterface.nodeTypeMapper,
+  nodeInterface: generatedNodeInterface.nodeInterface,
+  nodeField: generatedNodeInterface.nodeField
+};
+const defaultGeneratedConnectionResult: GeneratedConnectionResult = {
+  source: undefined,
+  args: {},
+  where: {}
+};
 const connection = sequelizeConnection({
   name: 'PublicApiUser',
   nodeType: userType,
@@ -275,6 +437,18 @@ void generatedListArgs;
 void generatedResolverFactory;
 void generatedPreferredResolver;
 void generatedAssociationResolver;
+void generatedConnectionResolver;
+void generatedConnection;
+void generatedNodeTypeMapper;
+void generatedNodeInterface;
+void generatedModelNodeType;
+void generatedCallableNodeType;
+void generatedStandaloneSource;
+void generatedStandaloneStatus;
+void generatedStandaloneArgs;
+void transformedGeneratedConnection;
+void legacyGeneratedNodeInterface;
+void defaultGeneratedConnectionResult;
 void associationResolverWithCanonicalOptions;
 void generatedSingleSimplified;
 void generatedCollectionFields;
@@ -322,3 +496,31 @@ createConnection({ target: User });
 
 // @ts-expect-error sequelizeConnection requires a GraphQL node type.
 sequelizeConnection({ target: User });
+
+const customResolverWithoutAfter = { target: UserTasks };
+generatedCreateConnectionResolver<
+  Model,
+  ConnectionSource,
+  ConnectionArgs,
+  ResolverContext,
+  TransformedConnectionOutput
+>(
+  // @ts-expect-error A custom resolver output requires an after hook.
+  customResolverWithoutAfter
+);
+
+const customConnectionWithoutAfter = {
+  name: 'GeneratedInvalidCustomOutput',
+  nodeType: userType,
+  target: UserTasks
+};
+generatedCreateConnection<
+  Model,
+  ConnectionSource,
+  ConnectionArgs,
+  ResolverContext,
+  TransformedConnectionOutput
+>(
+  // @ts-expect-error A custom connection output requires an after hook.
+  customConnectionWithoutAfter
+);

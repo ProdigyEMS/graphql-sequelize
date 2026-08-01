@@ -150,6 +150,60 @@ try {
       .includes('export const resolver'),
     'The package-owned TypeScript declarations are missing.'
   );
+
+  const relayDeclarations = readFileSync(
+    path.join(installedPackage, 'lib', 'relay.d.ts'),
+    'utf8'
+  );
+  assert(
+    !/\bfrom\s+['"]graphql-relay['"]/.test(relayDeclarations),
+    'Generated Relay declarations depend on graphql-relay type declarations.'
+  );
+
+  run('npm', [
+    'install',
+    '--ignore-scripts',
+    '--legacy-peer-deps',
+    '--no-audit',
+    '--no-fund',
+    'graphql@16.6.0',
+    'graphql-relay@0.4.2',
+    'sequelize@6.37.8'
+  ]);
+  writeFileSync(
+    path.join(consumerDirectory, 'relay-types.ts'),
+    [
+      "import { handleConnection } from '@prodigyems/graphql-sequelize/lib/relay.js';",
+      "import type { NodeInterfaceDefinition } from '@prodigyems/graphql-sequelize/lib/contracts.js';",
+      '',
+      'declare const nodeInterface: NodeInterfaceDefinition;',
+      'const nodesField = nodeInterface.nodesField;',
+      "const connection = handleConnection([{ id: 1 }], { first: 1 });",
+      '',
+      'void nodesField;',
+      'void connection;',
+      ''
+    ].join('\n')
+  );
+  writeFileSync(
+    path.join(consumerDirectory, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        module: 'Node16',
+        moduleResolution: 'Node16',
+        noEmit: true,
+        skipLibCheck: false,
+        strict: true,
+        target: 'ES2022'
+      },
+      include: ['relay-types.ts']
+    })
+  );
+  run(process.execPath, [
+    require.resolve('typescript/bin/tsc'),
+    '--project',
+    path.join(consumerDirectory, 'tsconfig.json')
+  ]);
 } finally {
   rmSync(consumerDirectory, { force: true, recursive: true });
 }
