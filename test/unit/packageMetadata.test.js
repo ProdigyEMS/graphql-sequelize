@@ -7,8 +7,23 @@ import path from 'path';
 const packageJson = JSON.parse(
   readFileSync(path.resolve('package.json'), 'utf8')
 );
+const packageLock = JSON.parse(
+  readFileSync(path.resolve('package-lock.json'), 'utf8')
+);
+const changelog = readFileSync(path.resolve('CHANGELOG.md'), 'utf8');
 
 describe('package metadata', function () {
+  it('pins the immutable 2.0.0 release metadata', function () {
+    expect(packageJson.version).to.equal('2.0.0');
+    expect(packageLock.version).to.equal('2.0.0');
+    expect(packageLock.packages[''].version).to.equal('2.0.0');
+    expect(changelog).to.include('## [2.0.0] - 2026-08-01');
+    expect(changelog).to.include(
+      '[2.0.0]: https://github.com/ProdigyEMS/graphql-sequelize/compare/' +
+        'prodigy-v1.0.0...prodigy-v2.0.0'
+    );
+  });
+
   it('publishes a native ESM root with generated declarations', function () {
     expect(packageJson.type).to.equal('module');
     expect(packageJson.main).to.equal('./lib/index.js');

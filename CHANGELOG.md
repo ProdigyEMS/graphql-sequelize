@@ -2,7 +2,7 @@
 
 All notable changes to the ProdigyEMS fork are documented here.
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-08-01
 
 ### Breaking
 
@@ -78,4 +78,4 @@ All notable changes to the ProdigyEMS fork are documented here.
   findings.
 
 [1.0.0]: https://github.com/ProdigyEMS/graphql-sequelize/compare/v9.5.1...prodigy-v1.0.0
-[2.0.0]: https://github.com/ProdigyEMS/graphql-sequelize/compare/prodigy-v1.0.0...HEAD
+[2.0.0]: https://github.com/ProdigyEMS/graphql-sequelize/compare/prodigy-v1.0.0...prodigy-v2.0.0

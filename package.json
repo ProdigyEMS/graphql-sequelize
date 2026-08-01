@@ -1,6 +1,6 @@
 {
   "name": "@prodigyems/graphql-sequelize",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "GraphQL and Relay helpers for Sequelize 6",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
