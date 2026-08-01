@@ -63,8 +63,9 @@ describe('continuous integration configuration', function () {
         'npm run test:unit'
     );
     expect(packageJson.scripts.test).to.equal(
-      'npm run lint && npm run test:types && npm run test:unit && ' +
-        'DIALECT=sqlite npm run test:integration && npm run test:package'
+      'npm run lint && npm run test:types && npm run test:inventory && ' +
+        'npm run test:unit && DIALECT=sqlite npm run test:integration && ' +
+        'npm run test:package'
     );
     expect(packageJson.scripts['test:docker']).to.equal(
       'bash scripts/test-docker.sh'
