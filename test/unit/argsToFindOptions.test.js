@@ -65,6 +65,26 @@ describe('argsToFindOptions', function () {
     expect(findOptions.limit).to.be.equal(0);
   });
 
+  it('should allow shorthand scalar filters when validation is disabled', function () {
+    var findOptions = argsToFindOptions({ organizationId: 7 }, null);
+
+    expect(findOptions.where).to.deep.equal({ organizationId: 7 });
+  });
+
+  it('should preserve an own __proto__ shorthand filter', function () {
+    var shorthandValue = { eq: 7 };
+    var args = Object.fromEntries([['__proto__', shorthandValue]]);
+    var findOptions = argsToFindOptions(args, null);
+
+    expect({
+      hasOwnFilter: Object.prototype.hasOwnProperty.call(findOptions.where, '__proto__'),
+      prototype: Object.getPrototypeOf(findOptions.where)
+    }).to.deep.equal({ hasOwnFilter: true, prototype: null });
+    expect(
+      Object.getOwnPropertyDescriptor(findOptions.where, '__proto__').value
+    ).to.equal(shorthandValue);
+  });
+
   it('should enforce required filters when where is omitted', function () {
     expect(() =>
       argsToFindOptions(

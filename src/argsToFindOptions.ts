@@ -91,8 +91,11 @@ export default function argsToFindOptions(
             whereOptions
           );
           result.where = translatedWhere as FindOptions['where'];
-        } else if (~(filterableAttributes as readonly string[]).indexOf(key)) {
-          translatedWhere = translatedWhere || {};
+        } else if (
+          filterableAttributes === null || filterableAttributes?.includes(key)
+        ) {
+          translatedWhere = translatedWhere ||
+            Object.create(null) as WhereExpression;
           translatedWhere[key] = value;
           result.where = translatedWhere as FindOptions['where'];
         }
