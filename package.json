@@ -17,7 +17,7 @@
     "prepublishOnly": "npm run check && npm run test:package",
     "check": "npm run lint && npm run test:types && npm run test:inventory && npm run test:unit",
     "lint": "eslint src test scripts/*.cjs",
-    "build": "node scripts/clean-build.cjs && tsc -p tsconfig.build.json",
+    "build": "node scripts/clean-build.cjs && tsc -p tsconfig.build.json && node scripts/embed-declaration-map-sources.cjs",
     "test": "npm run lint && npm run test:types && npm run test:inventory && npm run test:unit && DIALECT=sqlite npm run test:integration && npm run test:package",
     "test:watch": "npm run test:unit -- --watch",
     "test:unit": "npm run build:test && mocha \".build/test/unit/**/*.test.js\"",

@@ -4,6 +4,9 @@ const { rmSync, mkdtempSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const {
+  verifySelfContainedSourceMaps
+} = require('./verify-source-maps.cjs');
 
 const repositoryRoot = path.resolve(__dirname, '..');
 const buildDirectory = path.join(repositoryRoot, 'lib');
@@ -123,6 +126,7 @@ try {
     tarballPath,
     JSON.stringify(packedFiles)
   ]);
+  verifySelfContainedSourceMaps(repositoryRoot, packedFiles);
 
   process.stdout.write(
     `Verified ${packResult.filename} (${packResult.files.length} files).\n`

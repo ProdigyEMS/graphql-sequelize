@@ -138,6 +138,10 @@ describe('defaultArgs', function () {
 
       expect(args).to.have.ownProperty('where');
       expect(args.where.type).to.be.an.instanceOf(GraphQLScalarType);
+      expect(args.where.description).to.equal(
+        'A JSON object conforming to the shape specified in ' +
+          'http://docs.sequelizejs.com/en/latest/docs/querying/'
+      );
     });
 
   });

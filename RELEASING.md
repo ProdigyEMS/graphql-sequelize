@@ -90,24 +90,26 @@ git tag -s prodigy-v2.0.0 "$release_commit" \
   -m "build(release): publish 2.0.0"
 ```
 
-Inspect the exact artifact one final time, then publish it without assigning
-`latest`. Re-run the clean-tree checks immediately before publishing and prove
-the signed tag still names the checked-out commit:
+Inspect the exact artifact one final time, then invoke the maintained release
+helper from the exact validated commit. The helper rechecks the tracked and
+untracked working tree, proves `HEAD` is the validated SHA and that the SHA is
+an ancestor of the freshly fetched `origin/master`, verifies the local tag is a
+signed annotated tag targeting that SHA, and pushes only the explicit full tag
+refspec. Before it pushes anything, it runs `npm pack --dry-run` and rechecks
+the clean working tree afterward. It then verifies the remote annotated tag's
+dereferenced target. The helper exits immediately on the first failed command
+or mismatched invariant; only after every gate passes does it run
+`npm publish --tag next` and look up the published integrity:
 
 ```sh
-npm pack --dry-run
-git diff --exit-code
-test -z "$(git status --porcelain)"
-test "$(git rev-parse HEAD)" = "$release_commit"
-test "$(git rev-list -n 1 prodigy-v2.0.0)" = "$release_commit"
-npm publish --tag next
-git push origin prodigy-v2.0.0
-npm view @prodigyems/graphql-sequelize@2.0.0 dist.integrity
+release_commit="<validated release SHA>"
+node scripts/publish-next-release.cjs "$release_commit"
 ```
 
 These gates ensure the tag and the published tarball are produced from the same
 reviewed commit. Never publish from a dirty working tree or from a PR-only
-commit.
+commit. Never split the helper's gates into independent shell commands: a failed
+verification must stop before the irreversible publish.
 
 ## Cut the consumer over to the registry
 

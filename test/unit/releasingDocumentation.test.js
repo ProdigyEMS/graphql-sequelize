@@ -23,6 +23,31 @@ describe('release documentation', function () {
     expect(normalizedReleasing).to.include(
       'repeat the complete library and Git-backed consumer validation'
     );
+
+    const tagCreation = 'git tag -s prodigy-v2.0.0 "$release_commit"';
+    const releaseHelper =
+      'node scripts/publish-next-release.cjs "$release_commit"';
+
+    expect(normalizedReleasing).to.include(tagCreation);
+    expect(normalizedReleasing).to.include(releaseHelper);
+    expect(normalizedReleasing.indexOf(tagCreation)).to.be.lessThan(
+      normalizedReleasing.indexOf(releaseHelper)
+    );
+    expect(releasing).not.to.match(
+      /^git push origin prodigy-v2\.0\.0$/m
+    );
+    expect(releasing).not.to.match(
+      /^npm publish --tag next$/m
+    );
+    expect(releasing).not.to.match(
+      /^npm pack --dry-run$/m
+    );
+    expect(normalizedReleasing).to.include(
+      'exits immediately on the first failed command or mismatched invariant'
+    );
+    expect(normalizedReleasing).to.include(
+      'runs `npm pack --dry-run` and rechecks the clean working tree afterward'
+    );
   });
 
   it('requires complete registry-backed validation before promotion', function () {

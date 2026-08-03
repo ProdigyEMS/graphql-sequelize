@@ -17,7 +17,10 @@ describe('package metadata', function () {
     expect(packageJson.version).to.equal('2.0.0');
     expect(packageLock.version).to.equal('2.0.0');
     expect(packageLock.packages[''].version).to.equal('2.0.0');
-    expect(changelog).to.include('## [2.0.0] - 2026-08-01');
+    expect(changelog).to.include('## [2.0.0] - 2026-08-03');
+    expect(changelog).to.include(
+      'On 2026-08-03, `npm audit --omit=dev` reported zero vulnerabilities.'
+    );
     expect(changelog).to.include(
       '[2.0.0]: https://github.com/ProdigyEMS/graphql-sequelize/compare/' +
         'prodigy-v1.0.0...prodigy-v2.0.0'

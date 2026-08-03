@@ -98,6 +98,7 @@ describe('continuous integration configuration', function () {
         declarationMap: true,
         esModuleInterop: true,
         forceConsistentCasingInFileNames: true,
+        inlineSources: true,
         module: 'NodeNext',
         moduleResolution: 'NodeNext',
         noEmitOnError: true,
@@ -130,7 +131,8 @@ describe('continuous integration configuration', function () {
     expect(packageJson.main).to.equal('./lib/index.js');
     expect(packageJson.types).to.equal('./lib/index.d.ts');
     expect(packageJson.scripts.build).to.equal(
-      'node scripts/clean-build.cjs && tsc -p tsconfig.build.json'
+      'node scripts/clean-build.cjs && tsc -p tsconfig.build.json && ' +
+        'node scripts/embed-declaration-map-sources.cjs'
     );
     expect(packageJson.scripts['build:test']).to.equal(
       'rm -rf .build && tsc -p tsconfig.test.json'

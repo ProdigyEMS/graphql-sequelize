@@ -10,6 +10,9 @@ const {
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const {
+  verifySelfContainedSourceMaps
+} = require('../scripts/verify-source-maps.cjs');
 
 const generatedModules = [
   'argsToFindOptions',
@@ -152,6 +155,7 @@ try {
       );
     }
   }
+  verifySelfContainedSourceMaps(installedPackage, packedFiles);
 
   writeFileSync(
     consumerScriptPath,

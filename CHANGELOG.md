@@ -2,7 +2,7 @@
 
 All notable changes to the ProdigyEMS fork are documented here.
 
-## [2.0.0] - 2026-08-01
+## [2.0.0] - 2026-08-03
 
 ### Breaking
 
@@ -28,7 +28,7 @@ All notable changes to the ProdigyEMS fork are documented here.
 
 ### Security
 
-- On 2026-08-01, `npm audit --omit=dev` reported zero vulnerabilities. The
+- On 2026-08-03, `npm audit --omit=dev` reported zero vulnerabilities. The
   full development graph reported five vulnerable dependency instances: three
   low and two moderate. They arise from `diff` through Mocha/Sinon tooling and
   `uuid` through Sequelize's development dependency path. It reported zero

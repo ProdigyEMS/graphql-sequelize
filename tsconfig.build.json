@@ -6,6 +6,7 @@
     "declarationMap": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+    "inlineSources": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "noEmitOnError": true,
