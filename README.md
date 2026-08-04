@@ -229,7 +229,7 @@ for connection configuration and pagination examples.
 ```sh
 npm ci
 npm run check
-DIALECT=sqlite npm run test:integration
+npm run test:integration
 npm run test:package
 ```
 

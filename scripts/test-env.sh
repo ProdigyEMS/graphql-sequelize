@@ -7,7 +7,7 @@
 # script discovers the dynamically published ports from the isolated Compose
 # project that scripts/db-up.sh starts:
 #
-#   . scripts/test-env.sh && DIALECT=mssql node scripts/run-integration.cjs
+#   . scripts/test-env.sh && DIALECT=mssql npm run test:integration
 #
 # Cleanup is equally isolated:
 #

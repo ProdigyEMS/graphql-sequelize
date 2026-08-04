@@ -76,7 +76,7 @@ services:
 
   benchmark_server:
     build: .
-    command: [node, test/benchmark.js]
+    command: [node, test/benchmark.ts]
     ports:
       - name: benchmark
         target: 4001

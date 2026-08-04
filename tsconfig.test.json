@@ -1,16 +1,20 @@
 {
   "extends": "./tsconfig.build.json",
   "compilerOptions": {
-    "allowJs": true,
+    "allowJs": false,
+    "allowImportingTsExtensions": true,
     "declaration": false,
     "declarationMap": false,
-    "outDir": ".build",
+    "noEmit": true,
     "rootDir": "."
   },
   "include": [
-    "src/**/*",
-    "test/unit/**/*.js",
-    "test/integration/**/*.js",
-    "test/support/**/*.js"
+    "src/**/*.ts",
+    "test/unit/**/*.ts",
+    "test/support/**/*.ts",
+    "test/benchmark.ts",
+    "test/benchmark/**/*.ts",
+    "test/package-smoke.test.ts",
+    "vitest.config.ts"
   ]
 }

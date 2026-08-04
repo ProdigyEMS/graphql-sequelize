@@ -3,6 +3,17 @@
 const globals = require('globals');
 const typescriptEslint = require('typescript-eslint');
 
+const maintainedTypeScriptFiles = [
+  'src/**/*.ts',
+  'test/unit/**/*.ts',
+  'test/integration/**/*.ts',
+  'test/support/**/*.ts',
+  'test/benchmark.ts',
+  'test/benchmark/**/*.ts',
+  'test/package-smoke.test.ts',
+  'vitest.config.ts',
+];
+
 /**
  * Flat config port of the legacy .eslintrc.
  *
@@ -158,7 +169,7 @@ const javascriptConfig = {
 module.exports = [
   javascriptConfig,
   {
-    files: ['src/**/*.ts'],
+    files: maintainedTypeScriptFiles,
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -173,10 +184,10 @@ module.exports = [
   },
   ...typescriptEslint.configs.recommended.map((config) => ({
     ...config,
-    files: ['src/**/*.ts'],
+    files: maintainedTypeScriptFiles,
   })),
   {
-    files: ['src/**/*.ts'],
+    files: maintainedTypeScriptFiles,
     rules: {
       'no-undef': 'off',
       'no-unused-vars': 'off',
@@ -187,17 +198,18 @@ module.exports = [
     },
   },
   {
-    files: ['test/**/*.js', 'test/**/*.cjs'],
-    languageOptions: {
-      globals: {
-        ...globals.mocha,
-        expect: 'readonly',
-        assert: 'readonly',
-      },
+    files: [
+      'test/unit/**/*.ts',
+      'test/integration/**/*.ts',
+      'test/package-smoke.test.ts',
+    ],
+    rules: {
+      // Vitest deliberately supports property-chain assertions.
+      '@typescript-eslint/no-unused-expressions': 'off',
     },
   },
   {
-    files: ['scripts/**/*.cjs', 'test/**/*.cjs'],
+    files: ['scripts/**/*.cjs'],
     languageOptions: {
       sourceType: 'commonjs',
     },
