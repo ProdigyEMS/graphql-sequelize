@@ -24,4 +24,8 @@ describe('package metadata', function () {
   it('forces transitive js-yaml consumers onto the patched release', function () {
     expect(packageJson.overrides['js-yaml']).to.equal('^4.3.1');
   });
+
+  it('forces transitive brace-expansion consumers onto the patched release', function () {
+    expect(packageJson.overrides['brace-expansion']).to.equal('^5.0.9');
+  });
 });
