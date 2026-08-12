@@ -1652,9 +1652,12 @@ describe('resolver', function () {
 
       expect(result.code).to.equal('keyless-after');
       expect(result.status).to.equal('target');
-      expect(await KeylessUpdate.findOne({
-        where: { code: 'other-row' }
-      })).to.have.property('status', 'untouched');
+      const untouchedRows = await KeylessUpdate.findAll({
+        where: { code: 'other-row' },
+        raw: true
+      });
+      expect(untouchedRows).to.have.length(1);
+      expect(untouchedRows[0]).to.have.property('status', 'untouched');
     });
 
     it('uses updated composite primary keys to read changed rows', async function () {
