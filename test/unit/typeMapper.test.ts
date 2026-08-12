@@ -1,0 +1,254 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { mapType, toGraphQL } from '../../src/typeMapper.js';
+import JSONType from '../../src/types/jsonType.js';
+import DateType from '../../src/types/dateType.js';
+
+import Sequelize from 'sequelize';
+
+const {
+  BOOLEAN,
+  ENUM,
+  FLOAT,
+  REAL,
+  CHAR,
+  DECIMAL,
+  DOUBLE,
+  INTEGER,
+  BIGINT,
+  STRING,
+  TEXT,
+  UUID,
+  UUIDV4,
+  DATE,
+  DATEONLY,
+  TIME,
+  ARRAY,
+  VIRTUAL,
+  JSON,
+  JSONB,
+  INET,
+} = Sequelize;
+
+import {
+  GraphQLString,
+  GraphQLInt,
+  GraphQLBoolean,
+  GraphQLFloat,
+  GraphQLEnumType,
+  GraphQLList
+} from 'graphql';
+
+describe('typeMapper', () => {
+
+  describe('ARRAY', function () {
+    it('should map to instance of GraphQLList', function () {
+      expect(toGraphQL(new ARRAY(STRING), Sequelize)).to.instanceof(GraphQLList);
+    });
+  });
+
+  describe('BIGINT', function () {
+    it('should map to GraphQLString', function () {
+      expect(toGraphQL(new BIGINT(), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+
+  describe('BOOLEAN', function () {
+    it('should map to GraphQLBoolean', function () {
+      expect(toGraphQL(new BOOLEAN(), Sequelize)).to.equal(GraphQLBoolean);
+    });
+  });
+
+  describe('CHAR', function () {
+    it('should map to GraphQLString', function () {
+      expect(toGraphQL(new CHAR(), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+
+  describe('CUSTOM', function () {
+    const customDataType = {toSql: () => 'CUSTOM'};
+
+    beforeAll(function () {
+      // setup mapping
+      const legacyCustomMapper = (type: unknown) => {
+        if (type === customDataType) {
+          return GraphQLString;
+        }
+        if (type instanceof BOOLEAN) {
+          return GraphQLString;
+        }
+        if (type instanceof FLOAT) {
+          return false;
+        }
+      };
+      mapType(
+        legacyCustomMapper as unknown as Parameters<typeof mapType>[0]
+      );
+    });
+    it('should fallback to default types if it returns false', function () {
+      expect(toGraphQL(new FLOAT(), Sequelize)).to.equal(GraphQLFloat);
+    });
+    it('should allow the user to map types to anything', function () {
+      expect(toGraphQL(new BOOLEAN(), Sequelize)).to.equal(GraphQLString);
+    });
+    it('should run custom mappings before validating built-in inputs', function () {
+      expect(toGraphQL(customDataType, {STRING})).to.equal(GraphQLString);
+    });
+    it('should validate built-in inputs after custom mapping falls back', function () {
+      expect(() => toGraphQL({toSql: () => 'UNMAPPED'}, {STRING}))
+        .to.throw(TypeError, 'Expected the Sequelize data type registry.');
+    });
+    it('should apply custom mappings to ARRAY element types', function () {
+      const arrayType = new ARRAY(STRING);
+      const mutableArrayType = arrayType as unknown as { type: unknown };
+      mutableArrayType.type = customDataType;
+      const graphQLType = toGraphQL(arrayType, Sequelize);
+
+      expect(graphQLType).to.be.instanceof(GraphQLList);
+      if (!(graphQLType instanceof GraphQLList)) {
+        throw new TypeError('Expected ARRAY to map to GraphQLList.');
+      }
+      expect(graphQLType.ofType).to.equal(GraphQLString);
+    });
+    it('should apply custom mappings to VIRTUAL return types', function () {
+      const VirtualWithLegacyReturnType = VIRTUAL as unknown as new (
+        returnType: unknown
+      ) => InstanceType<typeof VIRTUAL>;
+
+      expect(toGraphQL(new VirtualWithLegacyReturnType(customDataType), Sequelize))
+        .to.equal(GraphQLString);
+    });
+
+    // reset mapType
+    afterAll(function () {
+      mapType(null);
+    });
+
+  });
+
+  describe('DATE', function () {
+    it('should map to DateType', function () {
+      expect(toGraphQL(new DATE(), Sequelize)).to.equal(DateType);
+    });
+  });
+
+  describe('DATEONLY', function () {
+    it('should map to GraphQLString', function () {
+      expect(toGraphQL(new DATEONLY(), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+
+  describe('DECIMAL', function () {
+    it('should map to GraphQLString', function () {
+      expect(toGraphQL(new DECIMAL(), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+
+  describe('DOUBLE', function () {
+    it('should map to GraphQLFloat', function () {
+      expect(toGraphQL(new DOUBLE(), Sequelize)).to.equal(GraphQLFloat);
+    });
+  });
+
+  describe('ENUM', function () {
+    it('should map to instance of GraphQLEnumType', function () {
+      expect(
+        toGraphQL(
+          new ENUM(
+            'value',
+            'another value',
+            'two--specials',
+            '25.8',
+            '¼',
+            '¼½',
+            '¼ ½',
+            '¼_½',
+            ' ¼--½_¾ - '
+          )
+          , Sequelize
+        )
+      ).to.instanceof(GraphQLEnumType);
+    });
+  });
+
+  describe('FLOAT', function () {
+    it('should map to GraphQLFloat', function () {
+      expect(toGraphQL(new FLOAT(), Sequelize)).to.equal(GraphQLFloat);
+    });
+  });
+
+  describe('REAL', function () {
+    it('should map to GraphQLFloat', function () {
+      expect(toGraphQL(new REAL(), Sequelize)).to.equal(GraphQLFloat);
+    });
+  });
+
+  describe('INTEGER', function () {
+    it('should map to GraphQLInt', function () {
+      expect(toGraphQL(new INTEGER(), Sequelize)).to.equal(GraphQLInt);
+    });
+  });
+
+  describe('STRING', function () {
+    it('should map to GraphQLString', function () {
+      expect(toGraphQL(new STRING(), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+
+  describe('TEXT', function () {
+    it('should map to GraphQLString', function () {
+      expect(toGraphQL(new TEXT(), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+
+  describe('TIME', function () {
+    it('should map to GraphQLString', function () {
+      expect(toGraphQL(new TIME(), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+
+  describe('UUID', function () {
+    it('should map to GraphQLString', function () {
+      expect(toGraphQL(new UUID(), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+
+  describe('UUIDV4', function () {
+    it('should map to GraphQLString', function () {
+      expect(toGraphQL(new UUIDV4(), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+
+  describe('VIRTUAL', function () {
+
+    it('should map to the sequelize return type', function () {
+      expect(toGraphQL(new VIRTUAL(BOOLEAN, ['createdAt']), Sequelize)).to.equal(GraphQLBoolean);
+    });
+
+    it('should default to a GraphQLString is a return type is not provided', function () {
+      expect(toGraphQL(new VIRTUAL(), Sequelize)).to.equal(GraphQLString);
+    });
+
+  });
+
+  describe('JSON', function () {
+    it('should map to JSONType', function () {
+      expect(toGraphQL(new JSON(), Sequelize)).to.equal(JSONType);
+    });
+  });
+
+  describe('JSONB', function () {
+    it('should map to JSONType', function () {
+      expect(toGraphQL(new JSONB(), Sequelize)).to.equal(JSONType);
+    });
+  });
+
+  describe('INET', function () {
+    it('should map to instance of GraphQLString', function () {
+      const InetWithAddress = INET as unknown as new (
+        address: string
+      ) => InstanceType<typeof INET>;
+
+      expect(toGraphQL(new InetWithAddress('127.0.0.1'), Sequelize)).to.equal(GraphQLString);
+    });
+  });
+});

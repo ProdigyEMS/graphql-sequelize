@@ -7,8 +7,9 @@ GraphQL and Relay helpers for Sequelize 6. The package maps GraphQL arguments
 to Sequelize queries, exposes Sequelize model attributes as GraphQL fields, and
 provides Relay connection helpers.
 
-This is the maintained ProdigyEMS fork. Version 1.0 intentionally has a smaller,
-safer resolver contract than the final 0.5 release.
+This is the maintained ProdigyEMS fork. Version 2.0 is a strict TypeScript,
+native-ESM-only package. It keeps the smaller, safer resolver contract
+introduced by version 1.0.
 
 ## Installation
 
@@ -22,15 +23,8 @@ The normal dependency graph is verified with GraphQL 16, graphql-relay 0.10,
 and Sequelize 6. See [GraphQL compatibility](#graphql-compatibility) for the
 separate GraphQL 17 lane.
 
-CommonJS and transpiled ES module imports are both supported:
-
-```js
-const {
-  attributeFields,
-  resolver,
-  sequelizeConnection
-} = require('@prodigyems/graphql-sequelize');
-```
+Version 2.0 requires Node 22 or newer and must be loaded as native ESM. Import
+public APIs from the package root:
 
 ```js
 import {
@@ -39,6 +33,10 @@ import {
   sequelizeConnection
 } from '@prodigyems/graphql-sequelize';
 ```
+
+CommonJS `require()` and deep imports such as
+`@prodigyems/graphql-sequelize/lib/resolver.js` are unsupported. The package
+exports map intentionally exposes only the root module.
 
 ## Resolver
 
@@ -75,6 +73,10 @@ GraphQL arguments to `where`, supports Relay connections, and chooses
 [dataloader-sequelize](https://github.com/mickhansen/dataloader-sequelize) or
 association resolvers for batching.
 
+Update resolvers accept predicates on the target model only. Joined update
+predicates are rejected because version 1 implemented them with unsafe,
+dialect-specific raw SQL.
+
 ### Required-filter security
 
 `requiredFilters` is an authorization boundary, not a hint. Each named filter
@@ -91,6 +93,25 @@ This prevents a caller from weakening an organization or tenant scope by
 placing it in only one logical branch. Continue to apply server-owned
 authorization in `before`; never accept an authorization value solely because
 the client supplied it.
+
+## Migrating from 1.0 to 2.0
+
+Version 2.0 preserves the version 1.0 resolver API: continue to call
+`resolver(target, options)` with the same `models`, `requiredFilters`, `list`,
+`handleConnection`, `operation`, `contextToOptions`, `before`, and `after`
+options. No resolver compatibility adapter or resolver-call API rewrite is
+needed.
+
+The package boundary has changed:
+
+- convert consumers to native ESM before upgrading;
+- replace `require('@prodigyems/graphql-sequelize')` with a root ESM import;
+- replace every deep import with the equivalent named root export; and
+- remove consumer ambient declarations or references to `types/index.d.ts`.
+
+Version 2.0 is authored in strict TypeScript and ships declarations generated
+from the implementation in `lib/`. Internal `lib/` paths remain private even
+though the generated files are present in the package.
 
 ## Migrating from 0.5 to 1.0
 
@@ -120,8 +141,8 @@ Other 1.0 migration notes:
 
 - Sequelize versions before 6 are no longer supported.
 - Package-owned TypeScript declarations replace consumer ambient declarations.
-- Root CommonJS exports are directly callable; no `.default` unwrapping is
-  needed.
+- The version 1.0 CommonJS root exported callable APIs without `.default`
+  unwrapping. Version 2.0 removes the CommonJS artifact entirely.
 - `limit: 0` returns an empty association result consistently.
 - Relay null ordering translates unsupported `NULLS FIRST`/`NULLS LAST`
   syntax for SQL Server and MySQL while preserving native PostgreSQL and SQLite
@@ -129,8 +150,10 @@ Other 1.0 migration notes:
 
 ## TypeScript
 
-Declarations ship at `types/index.d.ts` and cover resolver targets and options,
-hooks, field helpers, scalars, and Relay helpers.
+Compiler-generated declarations ship with the JavaScript under `lib/` and are
+resolved from the package root. They cover resolver targets and options, hooks,
+field helpers, scalars, and Relay helpers. Do not import declaration or runtime
+files from `lib/` directly.
 
 ```ts
 import {
@@ -210,13 +233,14 @@ for connection configuration and pagination examples.
 ```sh
 npm ci
 npm run check
-DIALECT=sqlite npm run test:integration
+npm run test:integration
 npm run test:package
 ```
 
 `npm run test:package` deletes local build output, runs the real npm pack
-lifecycle, verifies the exact tarball contents, installs that tarball in a clean
-temporary consumer, and loads its public APIs.
+lifecycle, verifies each generated JavaScript module, source map, declaration,
+and declaration map, rejects the obsolete `types/` directory, installs the
+tarball in a clean temporary ESM consumer, and loads its root public APIs.
 
 Release operators should follow
 [RELEASING.md](https://github.com/ProdigyEMS/graphql-sequelize/blob/master/RELEASING.md).

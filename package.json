@@ -1,29 +1,34 @@
 {
   "name": "@prodigyems/graphql-sequelize",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "GraphQL and Relay helpers for Sequelize 6",
-  "main": "lib/index.js",
-  "types": "types/index.d.ts",
-  "type": "commonjs",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    }
+  },
   "scripts": {
     "prepare": "npm run build",
-    "prepack": "npm run build",
-    "prepublishOnly": "npm run check && npm run test:package",
-    "check": "npm run lint && npm run test:types && npm run test:unit",
-    "lint": "eslint src test scripts/*.cjs",
-    "build": "node scripts/clean-build.cjs && babel src --ignore test --out-dir lib",
-    "test": "npm run lint && npm run test:types && npm run test:unit && DIALECT=sqlite npm run test:integration && npm run test:package",
-    "test:watch": "npm run test:unit -- --watch",
-    "test:unit": "npm run build:test && mocha \".build/test/unit/**/*.test.js\"",
-    "test:types": "tsc --project test/types/tsconfig.json",
-    "test:package": "node scripts/verify-package.cjs",
+    "prepublishOnly": "npm test",
+    "check": "npm run lint && npm run test:types && npm run test:typecheck && npm run test:unit",
+    "lint": "eslint src test scripts/*.cjs vitest.config.ts",
+    "build": "node scripts/clean-build.cjs && tsc -p tsconfig.build.json",
+    "test": "npm run lint && npm run test:types && npm run test:typecheck && npm run test:unit && npm run test:integration && npm run test:package",
+    "test:watch": "vitest",
+    "test:unit": "vitest run test/unit",
+    "test:types": "npm run build && tsc --project test/types/tsconfig.json",
+    "test:typecheck": "tsc --project tsconfig.test.json",
+    "test:package": "vitest run test/package-smoke.test.ts",
     "test:graphql17": "sh scripts/test-graphql17.sh",
     "build:docker": "docker compose build",
     "test:docker": "bash scripts/test-docker.sh",
-    "test:integration": "npm run build:test && node scripts/run-integration.cjs",
+    "test:integration": "vitest run --no-file-parallelism test/integration",
     "psql": "docker run -it --link graphqlsequelize_postgres_1:postgres --rm postgres:9.4 sh -c 'PGPASSWORD=graphql_sequelize_test exec psql -h \"$POSTGRES_PORT_5432_TCP_ADDR\" -p \"$POSTGRES_PORT_5432_TCP_PORT\" -U graphql_sequelize_test'",
-    "cover": "npm run build:test && c8 --reporter=text --reporter=lcov mocha \".build/test/unit/**/*.test.js\"",
-    "build:test": "rm -rf .build && babel src --out-dir .build/src && babel test --out-dir .build/test --ignore test/benchmark"
+    "cover": "vitest run --coverage test/unit"
   },
   "repository": {
     "type": "git",
@@ -44,7 +49,6 @@
   "homepage": "https://github.com/ProdigyEMS/graphql-sequelize#readme",
   "files": [
     "lib/",
-    "types/",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -63,28 +67,23 @@
     "sequelize": "^6.0.0"
   },
   "devDependencies": {
-    "@babel/cli": "^7.28.3",
-    "@babel/core": "^7.28.4",
-    "@babel/eslint-parser": "^7.28.4",
-    "@babel/preset-env": "^7.28.3",
-    "@babel/register": "^7.28.3",
-    "c8": "^10.1.3",
-    "chai": "^4.5.0",
-    "chai-as-promised": "^7.1.2",
+    "@types/bluebird": "^3.5.42",
+    "@types/lodash": "^4.17.25",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.37.0",
     "globals": "^15.15.0",
     "graphql": "^16.6.0",
+    "graphql-http": "^1.22.4",
     "graphql-relay": "^0.10.2",
-    "mocha": "^11.7.4",
     "mysql2": "^3.15.4",
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.8",
-    "sinon": "^19.0.5",
-    "sinon-chai": "^3.7.0",
     "sqlite3": "^6.0.1",
     "tedious": "^20.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
   },
   "directories": {
     "doc": "docs",
@@ -94,7 +93,10 @@
     "node": ">=22.0.0"
   },
   "overrides": {
-    "brace-expansion": "^5.0.8",
-    "serialize-javascript": "^7.0.5"
+    "brace-expansion": "^5.0.9",
+    "js-yaml": "^4.3.1",
+    "nanoid": "3.3.17",
+    "serialize-javascript": "^7.0.5",
+    "vite": "8.1.0"
   }
 }

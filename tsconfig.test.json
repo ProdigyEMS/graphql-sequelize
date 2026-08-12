@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "allowImportingTsExtensions": true,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/unit/**/*.ts",
+    "test/support/**/*.ts",
+    "test/benchmark.ts",
+    "test/benchmark/**/*.ts",
+    "test/package-smoke.test.ts",
+    "vitest.config.ts"
+  ]
+}
