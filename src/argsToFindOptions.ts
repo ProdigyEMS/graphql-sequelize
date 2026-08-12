@@ -92,12 +92,16 @@ export default function argsToFindOptions(
           );
           result.where = translatedWhere as FindOptions['where'];
         } else if (
-          filterableAttributes === null || filterableAttributes?.includes(key)
+          filterableAttributes === null ||
+          (Array.isArray(filterableAttributes) &&
+            filterableAttributes.includes(key))
         ) {
           translatedWhere = translatedWhere ||
             Object.create(null) as WhereExpression;
           translatedWhere[key] = value;
           result.where = translatedWhere as FindOptions['where'];
+        } else if (typeof filterableAttributes === 'undefined') {
+          throw new Error(`Unknown attribute: ${key}`);
         }
       }
     });

@@ -1551,6 +1551,145 @@ describe('resolver', function () {
       expect(after.mock.calls[0][0]).to.equal(result);
     });
 
+    it('does not limit the rows changed by an update', async function () {
+      await state.updateUser.update({ name: 'limit-one' });
+      await UpdateUser.bulkCreate([
+        { name: 'limit-two', status: 'active' },
+        { name: 'limit-three', status: 'active' },
+        { name: 'limit-four', status: 'active' }
+      ]);
+      const resolveUpdate = resolver(UpdateUser, {
+        list: true,
+        operation: 'update',
+        before(options) {
+          options.where = { name: { [Op.like]: 'limit-%' } };
+
+          return options;
+        }
+      });
+
+      const result = await resolveUpdate(
+        null,
+        { limit: 2, data: { status: 'updated' } },
+        {},
+        { ...updateInfo, returnType: new GraphQLList(updateInfo.returnType) }
+      );
+      const persisted = await UpdateUser.findAll({
+        attributes: ['status'],
+        order: [['id', 'ASC']],
+        raw: true
+      });
+
+      expect(result).to.have.length(2);
+      expect(result.map((row) => row.status)).to.deep.equal([
+        'updated',
+        'updated'
+      ]);
+      expect(persisted.map((row) => row.status)).to.deep.equal([
+        'updated',
+        'updated',
+        'updated',
+        'updated'
+      ]);
+    });
+
+    it('returns rows when the update changes a filtered attribute', async function () {
+      const resolveUpdate = resolver(UpdateUser, {
+        operation: 'update',
+        before(options) {
+          options.where = { name: 'before-update' };
+
+          return options;
+        }
+      });
+
+      const result = await resolveUpdate(
+        null,
+        { data: { name: 'after-update' } },
+        {},
+        updateInfo
+      );
+
+      expect(result.id).to.equal(state.updateUser.id);
+      expect(result.name).to.equal('after-update');
+    });
+
+    it('returns a keyless row when its filtered attribute changes', async function () {
+      const KeylessUpdate = sequelize.define('resolverKeylessUpdate', {
+        code: Sequelize.STRING,
+        status: Sequelize.STRING
+      });
+      KeylessUpdate.removeAttribute('id');
+      markFilterable(KeylessUpdate, 'code');
+      await KeylessUpdate.sync({ force: true });
+      await KeylessUpdate.bulkCreate([
+        { code: 'keyless-before', status: 'target' },
+        { code: 'other-row', status: 'untouched' }
+      ]);
+      await delay(10);
+      const keylessInfo = {
+        returnType: new GraphQLObjectType({
+          name: 'ResolverKeylessUpdate',
+          fields: {
+            code: { type: GraphQLString },
+            status: { type: GraphQLString }
+          }
+        }),
+        variableValues: {}
+      };
+
+      const result = await resolver(KeylessUpdate, {
+        operation: 'update'
+      })(
+        null,
+        {
+          where: { code: 'keyless-before' },
+          data: { code: 'keyless-after' }
+        },
+        {},
+        keylessInfo
+      );
+
+      expect(result.code).to.equal('keyless-after');
+      expect(result.status).to.equal('target');
+      expect(await KeylessUpdate.findOne({
+        where: { code: 'other-row' }
+      })).to.have.property('status', 'untouched');
+    });
+
+    it('uses updated composite primary keys to read changed rows', async function () {
+      const CompositeUpdate = sequelize.define('resolverCompositeUpdate', {
+        tenantId: { primaryKey: true, type: Sequelize.INTEGER },
+        userId: { primaryKey: true, type: Sequelize.INTEGER },
+        status: Sequelize.STRING
+      }, {
+        timestamps: false
+      });
+      await CompositeUpdate.sync({ force: true });
+      await CompositeUpdate.bulkCreate([
+        { tenantId: 1, userId: 1, status: 'active' },
+        { tenantId: 2, userId: 1, status: 'active' }
+      ]);
+      const result = await resolver(CompositeUpdate, {
+        operation: 'update'
+      })(
+        null,
+        {
+          where: { tenantId: 1, userId: 1 },
+          data: { tenantId: 9, status: 'updated' }
+        },
+        {},
+        updateInfo
+      );
+
+      expect(result.tenantId).to.equal(9);
+      expect(result.userId).to.equal(1);
+      expect(result.status).to.equal('updated');
+      expect(await CompositeUpdate.findOne({
+        where: { tenantId: 2, userId: 1 }
+      })).to.have.property('status', 'active');
+    });
+
     it('updates through a Date-valued attribute filter', async function () {
       const resolveUpdate = resolver(UpdateUser, { operation: 'update' });
 
@@ -1989,6 +2128,54 @@ describe('resolver', function () {
         findOne.mockRestore();
       }
     });
+
+    it('supports object attribute projections on Relay connections', async function () {
+      const connection = createConnection({
+        name: 'ResolverObjectScopedUsers',
+        nodeType: objectInfo.returnType,
+        target: ObjectScopedUser
+      });
+      const scopedSchema = new GraphQLSchema({
+        query: new GraphQLObjectType({
+          name: 'ResolverObjectScopedQuery',
+          fields: {
+            users: {
+              args: connection.connectionArgs,
+              resolve: connection.resolve,
+              type: connection.connectionType
+            }
+          }
+        })
+      });
+
+      const result = await graphql({
+        schema: scopedSchema,
+        source: `
+          query {
+            users(first: 1) {
+              edges {
+                node {
+                  name
+                  status
+                }
+              }
+            }
+          }
+        `
+      });
+
+      expect(result.errors).to.equal(undefined);
+      expect(result.data).to.deep.equal({
+        users: {
+          edges: [{
+            node: {
+              name: 'object-visible',
+              status: 'active'
+            }
+          }]
+        }
+      });
+    });
   });
 
   describe('resolver-local count context', function () {
@@ -2042,6 +2229,28 @@ describe('resolver', function () {
       };
     });
 
+    it('preserves caller-owned model and where context fields', async function () {
+      const sharedContext = {
+        model: 'v2-api',
+        where: 'tenant-42'
+      };
+      const resolveAlpha = resolver(CountAlpha, {
+        list: true,
+        after: async (result, _args, context) => {
+          expect(context.model).to.equal('v2-api');
+          expect(context.where).to.equal('tenant-42');
+          expect(await context.count()).to.equal(3);
+
+          return result;
+        }
+      });
+
+      await resolveAlpha(null, {}, sharedContext, alphaInfo);
+
+      expect(sharedContext.model).to.equal('v2-api');
+      expect(sharedContext.where).to.equal('tenant-42');
+    });
+
     it('isolates count closures across concurrent sibling after hooks', async function () {
       const sharedContext = {};
       let arrived = 0;
@@ -2056,11 +2265,7 @@ describe('resolver', function () {
         }
         await bothAfterHooksArrived;
 
-        return {
-          count: await context.count(),
-          model: context.model,
-          where: context.where
-        };
+        return { count: await context.count() };
       };
       const resolveAlpha = resolver(CountAlpha, { list: true, after });
       const resolveBeta = resolver(CountBeta, { list: true, after });
@@ -2080,18 +2285,8 @@ describe('resolver', function () {
         )
       ]);
 
-      expect(alphaContext).to.deep.equal({
-        count: 2,
-        model: CountAlpha,
-        where: { category: 'included' }
-      });
-      expect(betaContext).to.deep.equal({
-        count: 3,
-        model: CountBeta,
-        where: { category: 'included' }
-      });
-      expect(sharedContext.model).to.equal(CountBeta);
-      expect(sharedContext.where).to.deep.equal({ category: 'included' });
+      expect(alphaContext).to.deep.equal({ count: 2 });
+      expect(betaContext).to.deep.equal({ count: 3 });
       expect(await sharedContext.count()).to.equal(3);
     });
 
@@ -2227,8 +2422,6 @@ describe('resolver', function () {
         const countOptions = count.mock.calls[0][0];
 
         expect(result).to.equal(2);
-        expect(context.model).to.equal(CountAlpha);
-        expect(context.where).to.deep.equal({ category: 'included' });
         expect(countOptions.transaction).to.equal(transaction);
         expect(countOptions.logging).to.equal(logging);
         expect(countOptions.paranoid).to.equal(false);
@@ -2255,14 +2448,9 @@ describe('resolver', function () {
       const resolveAlpha = resolver(CountAlpha, {
         list: true,
         after(result, _args, localContext) {
-          expect(localContext.model).to.equal(CountAlpha);
-          expect(localContext.where).to.deep.equal({ category: 'included' });
-
-          localContext.model = 'overridden-model';
           localContext.count = replacementCount;
           localContext.extensionField = extensionValue;
 
-          expect(localContext.model).to.equal('overridden-model');
           expect(localContext.count).to.equal(replacementCount);
           expect(localContext.extensionField).to.equal(extensionValue);
           hookKeys = Object.keys(localContext);
@@ -2279,14 +2467,11 @@ describe('resolver', function () {
         alphaInfo
       );
 
-      expect(sharedContext.model).to.equal('overridden-model');
       expect(sharedContext.count).to.equal(replacementCount);
       expect(sharedContext.extensionField).to.equal(extensionValue);
       expect(hookHasExtension).to.equal(true);
       expect(hookKeys).to.have.members([
         'existingField',
-        'model',
-        'where',
         'count',
         'extensionField'
       ]);
@@ -2311,8 +2496,6 @@ describe('resolver', function () {
               value: replacementCount,
               writable: true
             });
-            expect(delete localContext.where).to.equal(true);
-
             return result;
           }
 
@@ -2321,11 +2504,6 @@ describe('resolver', function () {
             countDescriptor: Object.getOwnPropertyDescriptor(
               localContext,
               'count'
-            ),
-            where: localContext.where,
-            whereDescriptor: Object.getOwnPropertyDescriptor(
-              localContext,
-              'where'
             )
           };
 
@@ -2341,7 +2519,6 @@ describe('resolver', function () {
       );
 
       expect(sharedContext.count).to.equal(replacementCount);
-      expect(sharedContext).to.not.have.property('where');
 
       await resolveAlpha(
         null,
@@ -2351,21 +2528,13 @@ describe('resolver', function () {
       );
 
       expect(secondSnapshot.count).to.equal(2);
-      expect(secondSnapshot.where).to.deep.equal({ category: 'included' });
       expect(secondSnapshot.countDescriptor).to.include({
         configurable: true,
         enumerable: true
       });
       expect(secondSnapshot.countDescriptor.get).to.be.a('function');
       expect(secondSnapshot.countDescriptor.set).to.be.a('function');
-      expect(secondSnapshot.whereDescriptor).to.include({
-        configurable: true,
-        enumerable: true
-      });
-      expect(secondSnapshot.whereDescriptor.get).to.be.a('function');
-      expect(secondSnapshot.whereDescriptor.set).to.be.a('function');
       expect(await sharedContext.count()).to.equal(2);
-      expect(sharedContext.where).to.deep.equal({ category: 'included' });
     });
 
     it('keeps native fallback behavior for non-configurable metadata', async function () {
@@ -2413,7 +2582,6 @@ describe('resolver', function () {
       const resolveAlpha = resolver(CountAlpha, {
         list: true,
         after(result, _args, localContext) {
-          localContext.model = 'set-model';
           Object.defineProperty(localContext, 'count', {
             configurable: true,
             enumerable: false,
@@ -2428,7 +2596,6 @@ describe('resolver', function () {
           });
           localContext.temporaryExtension = 'temporary';
 
-          expect(delete localContext.where).to.equal(true);
           expect(delete localContext.temporaryExtension).to.equal(true);
           expect(() => {
             Object.defineProperty(localContext, 'permanentExtension', {
@@ -2447,16 +2614,13 @@ describe('resolver', function () {
             ),
             hasPermanentExtension: 'permanentExtension' in localContext,
             hasTemporaryExtension: 'temporaryExtension' in localContext,
-            hasWhere: 'where' in localContext,
             keys: Reflect.ownKeys(localContext),
-            model: localContext.model,
             permanentDescriptor: Object.getOwnPropertyDescriptor(
               localContext,
               'permanentExtension'
             ),
             permanentExtension: localContext.permanentExtension,
-            temporaryExtension: localContext.temporaryExtension,
-            where: localContext.where
+            temporaryExtension: localContext.temporaryExtension
           };
 
           return result;
@@ -2470,12 +2634,9 @@ describe('resolver', function () {
         alphaInfo
       );
 
-      expect(mutationSnapshot.model).to.equal('set-model');
       expect(mutationSnapshot.count).to.equal(definedCount);
-      expect(mutationSnapshot.where).to.equal(undefined);
       expect(mutationSnapshot.temporaryExtension).to.equal(undefined);
       expect(mutationSnapshot.permanentExtension).to.equal('permanent');
-      expect(mutationSnapshot.hasWhere).to.equal(false);
       expect(mutationSnapshot.hasTemporaryExtension).to.equal(false);
       expect(mutationSnapshot.hasPermanentExtension).to.equal(true);
       expect(mutationSnapshot.keys).to.have.members(
@@ -2490,9 +2651,7 @@ describe('resolver', function () {
           'permanentExtension'
         )
       );
-      expect(sharedContext.model).to.equal('set-model');
       expect(sharedContext.count).to.equal(definedCount);
-      expect(sharedContext).to.not.have.property('where');
       expect(sharedContext).to.not.have.property('temporaryExtension');
       expect(sharedContext.permanentExtension).to.equal('permanent');
       expect(await sharedContext.count()).to.equal(73);

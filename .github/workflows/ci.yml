@@ -28,7 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --audit-level=high
 
   graphql-17:
     name: GraphQL 17 compatibility

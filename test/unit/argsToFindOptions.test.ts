@@ -71,6 +71,12 @@ describe('argsToFindOptions', function () {
     expect(findOptions.where).to.deep.equal({ organizationId: 7 });
   });
 
+  it('should reject shorthand filters when allowed attributes are omitted', function () {
+    expect(() => argsToFindOptions({ limit: 5, name: 'bob' })).to.throw(
+      'Unknown attribute: name'
+    );
+  });
+
   it('should preserve an own __proto__ shorthand filter', function () {
     const shorthandValue = { eq: 7 };
     const args = Object.fromEntries([['__proto__', shorthandValue]]);

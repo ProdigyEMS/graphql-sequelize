@@ -49,14 +49,18 @@ export interface AttributeFieldsOptions {
  * @return whether the selector matches the attribute
  */
 function selectorMatches(
-  selector: AttributeSelector,
+  selector: unknown,
   attributeName: string
-): boolean {
+): boolean | undefined {
   if (typeof selector === 'function') {
-    return selector(attributeName);
+    return (selector as AttributePredicate)(attributeName);
   }
 
-  return selector.includes(attributeName);
+  if (Array.isArray(selector)) {
+    return selector.includes(attributeName);
+  }
+
+  return undefined;
 }
 
 /**
@@ -141,7 +145,7 @@ export default function attributeFields(
       return fields;
     }
 
-    if (options.only && !selectorMatches(options.only, attributeName)) {
+    if (options.only && selectorMatches(options.only, attributeName) === false) {
       return fields;
     }
 

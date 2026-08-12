@@ -34,8 +34,8 @@ export type ResolverArguments = Record<string, unknown>;
 export interface RelayConnectionArguments {
   before?: string | null;
   after?: string | null;
-  first?: number | null;
-  last?: number | null;
+  first?: number | string | null;
+  last?: number | string | null;
 }
 
 /** One edge returned by graphql-relay's in-memory connection helper. */

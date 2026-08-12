@@ -10,6 +10,9 @@ All notable changes to the ProdigyEMS fork are documented here.
   longer supported.
 - Expose only the package root. Deep imports from `lib/` are no longer
   supported.
+- Reject joined update predicates. Version 1 built those updates with
+  dialect-specific raw SQL and interpolated values; version 2 supports only
+  Sequelize model updates whose predicates reference the target model.
 
 ### Changed
 
@@ -31,6 +34,8 @@ All notable changes to the ProdigyEMS fork are documented here.
 - On 2026-08-04, `npm audit --omit=dev` reported zero vulnerabilities. The full
   audit reported two moderate and one high development-only vulnerability
   through the development Sequelize dependency.
+- On 2026-08-12, the full `npm audit --audit-level=high` gate reported no high
+  or critical vulnerabilities after patching transitive build dependencies.
 
 ## [1.0.0] - 2026-07-31
 

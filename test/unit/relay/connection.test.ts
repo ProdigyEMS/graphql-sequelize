@@ -25,6 +25,7 @@ import {
 import {
   NodeTypeMapper,
   createConnectionResolver,
+  handleConnection,
   idFetcher,
   sequelizeConnection,
   typeResolver
@@ -60,6 +61,16 @@ describe('relay', function () {
 
     expect(fetchedNode).to.equal(callableNode);
     expect(typeResolver(nodeTypeMapper)(callableNode)).to.equal('CallableNode');
+  });
+
+  it('coerces legacy string counts in in-memory connections', function () {
+    const connection = Reflect.apply(handleConnection, undefined, [
+      [{ id: 1 }, { id: 2 }],
+      { first: '1' }
+    ]);
+
+    expect(connection.edges).to.have.length(1);
+    expect(connection.edges[0].node).to.deep.equal({ id: 1 });
   });
 
   describe('connections', function () {

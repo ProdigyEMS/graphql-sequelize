@@ -64,6 +64,14 @@ type ConnectionArgumentsWithFilters = ResolverArguments & RelayConnectionArgumen
   orderBy?: unknown;
 };
 
+type NormalizedConnectionArguments = Omit<
+  RelayConnectionArguments,
+  'first' | 'last'
+> & {
+  first?: number | null;
+  last?: number | null;
+};
+
 type RelayOrderAttribute<TSource, TContext, TArgs> =
   | string
   | Record<string, unknown>
@@ -174,17 +182,23 @@ function canCarryNodeMetadata(value: unknown): value is Record<string, unknown> 
 }
 
 /** Read GraphQL connection arguments from an untyped resolver boundary. */
-function readConnectionArguments(value: unknown): RelayConnectionArguments {
+function readConnectionArguments(value: unknown): NormalizedConnectionArguments {
   if (!isObjectRecord(value)) {
     throw new TypeError('Connection arguments must be an object.');
   }
 
   const { before, after, first, last } = value;
+  const normalizedFirst = typeof first === 'string' && /^-?\d+$/u.test(first)
+    ? parseInt(first, 10)
+    : first;
+  const normalizedLast = typeof last === 'string' && /^-?\d+$/u.test(last)
+    ? parseInt(last, 10)
+    : last;
   if (
     ![before, after].every(
       cursor => cursor === undefined || cursor === null || typeof cursor === 'string'
     ) ||
-    ![first, last].every(
+    ![normalizedFirst, normalizedLast].every(
       count => count === undefined || count === null || typeof count === 'number'
     )
   ) {
@@ -194,8 +208,12 @@ function readConnectionArguments(value: unknown): RelayConnectionArguments {
   return {
     before: before === null || typeof before === 'string' ? before : undefined,
     after: after === null || typeof after === 'string' ? after : undefined,
-    first: first === null || typeof first === 'number' ? first : undefined,
-    last: last === null || typeof last === 'number' ? last : undefined
+    first: normalizedFirst === null || typeof normalizedFirst === 'number'
+      ? normalizedFirst
+      : undefined,
+    last: normalizedLast === null || typeof normalizedLast === 'number'
+      ? normalizedLast
+      : undefined
   };
 }
 
@@ -687,11 +705,15 @@ function createConnectionResolverImplementation<
           ]);
         }
 
-        if (!Array.isArray(options.attributes)) {
-          throw new TypeError('Connection attributes must be an array.');
-        }
-
-        const attributes: Array<unknown> = options.attributes;
+        const projection = options.attributes;
+        const attributes: Array<unknown> = Array.isArray(projection)
+          ? projection
+          : [
+            ...Object.keys(model.getAttributes()).filter(
+              attributeName => !projection?.exclude?.includes(attributeName)
+            ),
+            ...(projection?.include || [])
+          ];
         if (typeof orderAttribute === 'string') {
           attributes.push(orderAttribute);
         }

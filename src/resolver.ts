@@ -646,12 +646,83 @@ function createUpdateOptions(
     'attributes',
     'group',
     'include',
+    'limit',
     'offset',
     'order'
   ].forEach((key) => Reflect.deleteProperty(updateOptionsRecord, key));
   updateOptionsRecord.fields = [...fields];
 
   return updateOptions as UpdateOptions;
+}
+
+/**
+ * Capture an exact post-update identity for every selected row.
+ *
+ * The update itself must ignore read pagination, while the read-after-write
+ * still applies it. Capturing the complete identifier set also lets that read
+ * find rows when the update changes a field used by the original predicate.
+ *
+ * @param findOptions resolved read options containing the update predicate
+ * @param model model being updated
+ * @param data validated update values
+ * @return a predicate matching exactly the rows selected before the update
+ */
+async function captureUpdateResultWhere(
+  findOptions: FindOptions,
+  model: ModelStatic<Model>,
+  data: Record<string, unknown>
+): Promise<FindOptions['where'] | undefined> {
+  const primaryKeys = model.primaryKeyAttributes;
+  const automaticallyChangedAttributes = new Set<string>();
+  if (model.options.timestamps !== false && model.options.updatedAt !== false) {
+    automaticallyChangedAttributes.add(
+      typeof model.options.updatedAt === 'string'
+        ? model.options.updatedAt
+        : 'updatedAt'
+    );
+  }
+  if (model.options.version) {
+    automaticallyChangedAttributes.add(
+      typeof model.options.version === 'string'
+        ? model.options.version
+        : 'version'
+    );
+  }
+  const identityAttributes = primaryKeys.length > 0
+    ? primaryKeys
+    : Object.entries(getResolverAttributes(model))
+      .filter(([attributeName, attribute]) =>
+        attribute.type.key !== 'VIRTUAL' &&
+        !automaticallyChangedAttributes.has(attributeName)
+      )
+      .map(([attributeName]) => attributeName);
+  if (identityAttributes.length === 0) {
+    return undefined;
+  }
+
+  const targetOptions = {...findOptions};
+  const targetOptionsRecord = propertyRecord(targetOptions);
+  targetOptionsRecord.attributes = [...identityAttributes];
+  targetOptionsRecord.raw = true;
+  ['group', 'limit', 'offset', 'order'].forEach((key) =>
+    Reflect.deleteProperty(targetOptionsRecord, key)
+  );
+
+  const targets = await model.findAll(targetOptions);
+  const identifiers = targets.map((target) => {
+    const targetRecord = propertyRecord(target);
+
+    return Object.fromEntries(
+      identityAttributes.map((attributeName) => [
+        attributeName,
+        Object.prototype.hasOwnProperty.call(data, attributeName)
+          ? data[attributeName]
+          : targetRecord[attributeName]
+      ])
+    );
+  });
+
+  return { [Op.or]: identifiers } as FindOptions['where'];
 }
 
 /**
@@ -676,10 +747,8 @@ function createCountOptions(findOptions: FindOptions): CountOptions {
   return countOptions as CountOptions;
 }
 
-/** Fields exposed to resolver after hooks for the current model read. */
+/** Field exposed to resolver after hooks for the current model read. */
 interface ResolverCountContext {
-  readonly model: ModelStatic<Model>;
-  readonly where: FindOptions['where'];
   readonly count: () => Promise<unknown>;
 }
 
@@ -707,8 +776,6 @@ interface ResolverSharedContextState {
 }
 
 const RESOLVER_CONTEXT_METADATA_KEYS = [
-  'model',
-  'where',
   'count',
 ] as const satisfies readonly ResolverContextMetadataKey[];
 const resolverInvocationStorage =
@@ -795,7 +862,7 @@ function getResolverSharedContextState(
  * read-only properties remain untouched without a defineProperty failure.
  *
  * @param context original GraphQL context value
- * @param countContext resolver-local model and count fields
+ * @param countContext resolver-local count field
  * @return async-local invocation state, or undefined for primitive contexts
  */
 function prepareResolverContext<TContext>(
@@ -1273,11 +1340,20 @@ const resolverFactory: ResolverFactory = function resolverFactory<
             fields,
             model
           );
+          const updateResultWhere = await captureUpdateResultWhere(
+            findOptions,
+            model,
+            argsRecord.data as Record<string, unknown>
+          );
 
           await model.update(
             argsRecord.data as Record<string, unknown>,
             updateOptions
           );
+
+          if (updateResultWhere) {
+            findOptions.where = updateResultWhere;
+          }
         }
 
         if (association) {
@@ -1357,8 +1433,6 @@ const resolverFactory: ResolverFactory = function resolverFactory<
 
         const countOptions = createCountOptions(findOptions);
         const countContext: ResolverCountContext = {
-          model,
-          where: findOptions.where,
           count: () => model.count(countOptions),
         };
 

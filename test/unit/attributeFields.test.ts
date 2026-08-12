@@ -234,6 +234,21 @@ describe('attributeFields', function () {
     expect(Object.keys(fields)).to.deep.equal(['id', 'email', 'list']);
   });
 
+  it('should ignore unsupported selector objects like version 1', function () {
+    const excluded = Reflect.apply(attributeFields, undefined, [
+      Model,
+      { exclude: new Set(['email']) }
+    ]);
+    const selected = Reflect.apply(attributeFields, undefined, [
+      Model,
+      { only: new Set(['email']) }
+    ]);
+
+    expect(excluded).to.have.property('email');
+    expect(selected).to.have.property('id');
+    expect(selected).to.have.property('email');
+  });
+
   it('should be possible to automatically set a relay globalId', function () {
     const fields = attributeFields(Model, {
       globalId: true

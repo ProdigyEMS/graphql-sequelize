@@ -36,9 +36,9 @@ describe('continuous integration configuration', function () {
     expect(workflow.match(/persist-credentials: false/g)).to.have.length(3);
     expect(workflow).not.to.match(/actions\/[^@\s]+@v\d+/);
     expect(workflow).to.include(
-      'run: npm audit --omit=dev --audit-level=high'
+      'run: npm audit --audit-level=high'
     );
-    expect(workflow).not.to.include('run: npm audit --audit-level=high');
+    expect(workflow).not.to.include('npm audit --omit=dev');
     expect(existsSync(path.resolve('.travis.yml'))).to.equal(false);
   });
 

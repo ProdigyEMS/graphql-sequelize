@@ -73,6 +73,10 @@ GraphQL arguments to `where`, supports Relay connections, and chooses
 [dataloader-sequelize](https://github.com/mickhansen/dataloader-sequelize) or
 association resolvers for batching.
 
+Update resolvers accept predicates on the target model only. Joined update
+predicates are rejected because version 1 implemented them with unsafe,
+dialect-specific raw SQL.
+
 ### Required-filter security
 
 `requiredFilters` is an authorization boundary, not a hint. Each named filter

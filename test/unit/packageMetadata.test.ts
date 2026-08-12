@@ -57,6 +57,14 @@ describe('package metadata', function () {
     ).to.deep.equal([]);
   });
 
+  it('pins patched transitive build dependencies', function () {
+    expect(packageJson.overrides).to.include({
+      'brace-expansion': '^5.0.9',
+      'js-yaml': '^4.3.1',
+      nanoid: '3.3.17'
+    });
+  });
+
   it('builds declarations before checking the public type contract', function () {
     expect(packageJson.scripts.prepare).to.equal('npm run build');
     expect(packageJson.scripts).not.to.have.property('prepack');
