@@ -20,4 +20,8 @@ describe('package metadata', function () {
       'npm run lint && npm run test:types && npm run test:unit'
     );
   });
+
+  it('forces transitive js-yaml consumers onto the patched release', function () {
+    expect(packageJson.overrides['js-yaml']).to.equal('^4.3.1');
+  });
 });
