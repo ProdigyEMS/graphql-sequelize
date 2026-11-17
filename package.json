@@ -82,7 +82,7 @@
     "sqlite3": "^6.0.1",
     "tedious": "^20.3.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.65.0",
+    "typescript-eslint": "^8.73.0",
     "vitest": "^4.1.12"
   },
   "directories": {
