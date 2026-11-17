@@ -61,7 +61,7 @@ describe('package metadata', function () {
     expect(packageJson.overrides).to.include({
       'brace-expansion': '^5.0.12',
       'js-yaml': '^4.3.1',
-      nanoid: '3.3.18'
+      nanoid: '3.3.20'
     });
   });
 
